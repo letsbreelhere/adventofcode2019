@@ -3,21 +3,18 @@ module DayOne where
 import Data.Monoid (Sum(..))
 
 fuelRequired :: Int -> Int
-fuelRequired x = x `div` 3 - 2
+fuelRequired = subtract 2 . (`div` 3)
 
 part1 :: [Int] -> Int
-part1 values = getSum . foldMap (Sum . fuelRequired) $ values
+part1 = getSum . foldMap (Sum . fuelRequired)
 
 repeatingFuelRequired :: Int -> Int
-repeatingFuelRequired x =
-  let init = fuelRequired x
-   in if init <= 0
-         then 0
-         else init + repeatingFuelRequired init
+repeatingFuelRequired = sum . tail . takeWhile (>0) . iterate fuelRequired
 
 part2 :: [Int] -> Int
-part2 values = getSum . foldMap (Sum . repeatingFuelRequired) $ values
+part2 = getSum . foldMap (Sum . repeatingFuelRequired)
 
+main :: IO ()
 main = do
   values <- map read . lines <$> readFile "1.txt" :: IO [Int]
   print $ part1 values
