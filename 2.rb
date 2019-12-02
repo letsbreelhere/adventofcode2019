@@ -1,56 +1,52 @@
 # frozen_string_literal: true
 
 class Intcode
-  attr_reader :ints, :index, :halt
+  attr_reader :ints, :ip, :halt
 
   UnknownOpcode = Struct.new(:opcode)
 
   def initialize(ints)
     @ints = ints.dup
-    @index = 0
+    @ip = 0
     @halt = false
   end
 
   def opcode
-    @ints[@index]
+    @ints[@ip]
   end
 
   def step
-    if ints.length - index > 2
-      operand1 = ints[ints[index + 1]]
-      operand2 = ints[ints[index + 2]]
-      result_index = ints[index + 3]
+    if ints.length - ip > 2
+      operand1 = ints[ints[ip + 1]]
+      operand2 = ints[ints[ip + 2]]
+      result_ip = ints[ip + 3]
     end
 
     case opcode
     when 1
-      @ints[result_index] = operand1 + operand2
+      @ints[result_ip] = operand1 + operand2
     when 2
-      @ints[result_index] = operand1 * operand2
+      @ints[result_ip] = operand1 * operand2
     when 99
       @halt = true
     else
       raise UnknownOpcode, opcode
     end
 
-    @index += 4
+    @ip += 4
   end
 
-  def run
+  def output
     step until halt
-    self
+    ints[0]
   end
-end
-
-def output(ints)
-  Intcode.new(ints).run.ints[0]
 end
 
 def output_with_noun_and_verb(ints, noun, verb)
   new_ints = ints.dup
   new_ints[1] = noun
   new_ints[2] = verb
-  Intcode.new(new_ints).run.ints[0]
+  Intcode.new(new_ints).output
 end
 
 input = File.read('2.txt').split(',').map(&:to_i)
