@@ -25,15 +25,15 @@ class Intcode
     case opcode
     when 1
       @ints[result_ip] = operand1 + operand2
+      @ip += 4
     when 2
       @ints[result_ip] = operand1 * operand2
+      @ip += 4
     when 99
       @halt = true
     else
       raise UnknownOpcode, opcode
     end
-
-    @ip += 4
   end
 
   def output
@@ -56,8 +56,8 @@ p output_with_noun_and_verb(input, 12, 2)
 def find_output(input, output)
   max_index = input.length - 1
 
-  (0..max_index).each do |noun|
-    (0..max_index).each do |verb|
+  (0..99).each do |noun|
+    (0..99).each do |verb|
       if output_with_noun_and_verb(input, noun, verb) == output
         return [noun, verb]
       end
