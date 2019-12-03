@@ -5,11 +5,12 @@ import Data.Foldable (toList)
 import Data.Sequence (Seq(..), (|>))
 import qualified Data.Sequence as Seq
 import Control.Applicative (liftA2)
-import Control.Monad (guard)
+import Control.Monad (guard, foldM)
 import Data.Functor (($>))
 import Data.List (foldl', minimum)
 import Data.Maybe (mapMaybe, catMaybes)
 import Data.Text (Text)
+import Text.Read (readMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 
@@ -81,30 +82,30 @@ minimizedSumDistance w1 w2 =
 
 ------------------------------------PARSING------------------------------------
 
-parseWireStep :: (Wire, Point) -> Text -> (Wire, Point)
-parseWireStep (ls, p@Point{x,y}) t =
-  let Just (c, rest) = T.uncons t
-      d = read (T.unpack rest) :: Int
-      p' = case c of
-             'L' -> p { x = x - d }
-             'R' -> p { x = x + d }
-             'D' -> p { y = y - d }
-             'U' -> p { y = y + d }
+parseWireStep :: (Wire, Point) -> Text -> Maybe (Wire, Point)
+parseWireStep (ls, p@Point{x,y}) t = do
+  (c, rest) <- T.uncons t
+  d <- readMaybe (T.unpack rest) :: Maybe Int
+  let p' = case c of
+         'L' -> p { x = x - d }
+         'R' -> p { x = x + d }
+         'D' -> p { y = y - d }
+         'U' -> p { y = y + d }
       l = Line p p'
-   in (ls |> l, p')
+  pure (ls |> l, p')
 
-parseWire :: Text -> Wire
-parseWire = fst . foldl' parseWireStep (Seq.empty, origin) . T.splitOn ","
+parseWire :: Text -> Maybe Wire
+parseWire = fmap fst . foldM parseWireStep (Seq.empty, origin) . T.splitOn ","
 
-parseWirePair :: Text -> (Wire, Wire)
+parseWirePair :: Text -> Maybe (Wire, Wire)
 parseWirePair input = let (a:b:_) = T.splitOn "\n" input
-                       in (parseWire a, parseWire b)
+                       in liftA2 (,) (parseWire a) (parseWire b)
 
 --------------------------------------MAIN--------------------------------------
 
 main :: IO ()
 main = do
-  (w1, w2) <- parseWirePair <$> T.readFile "3.txt"
+  Just (w1, w2) <- parseWirePair <$> T.readFile "3.txt"
   -- Part one
   print . minimum . filter (>0) . map (distance origin) $ wireIntersections w1 w2
   -- Part two
