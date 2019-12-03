@@ -1,6 +1,9 @@
 {-# LANGUAGE OverloadedStrings, NamedFieldPuns #-}
 module DayThree where
 
+import Data.Foldable (toList)
+import Data.Sequence (Seq(..), (|>))
+import qualified Data.Sequence as Seq
 import Control.Applicative (liftA2)
 import Control.Monad (guard)
 import Data.Functor (($>))
@@ -22,6 +25,8 @@ data Line = Line { start :: Point, finish :: Point }
 distance :: Point -> Point -> Int
 distance p p' = abs (x p - x p') + abs (y p - y p')
 
+type Wire = Seq Line
+
 -- This uses Manhattan distance, so it only works if we assume all lines are
 -- vertical or horizontal.
 pointIsOnLine :: Point -> Line -> Bool
@@ -29,10 +34,7 @@ pointIsOnLine p Line{ start, finish } =
   distance start p + distance p finish == distance start finish
 
 isVertical :: Line -> Bool
-isVertical l = y (start l) /= y (finish l)
-
-isHorizontal :: Line -> Bool
-isHorizontal = not . isVertical
+isVertical Line{start, finish} = y start /= y finish
 
 between a a' x = let b = min a a'
                      b' = max a a'
@@ -50,24 +52,24 @@ intersect l1 l2
   | isVertical l2 = l2 `intersect` l1
   | otherwise = Nothing
 
-wireIntersections :: [Line] -> [Line] -> [Point]
+wireIntersections :: Wire -> Wire -> [Point]
 wireIntersections ls ls' =
-  filter (/= origin) . catMaybes $ liftA2 intersect ls ls'
+  filter (/= origin) . catMaybes . toList $ liftA2 intersect ls ls'
 
 lineDistanceToPoint :: Line -> Point -> Maybe Int
 lineDistanceToPoint l p = do
   guard (pointIsOnLine p l)
   pure $ distance (start l) p
 
-wireDistanceToPoint :: [Line] -> Point -> Maybe Int
-wireDistanceToPoint [] _ = Nothing
-wireDistanceToPoint (l:ls) p =
+wireDistanceToPoint :: Wire -> Point -> Maybe Int
+wireDistanceToPoint Seq.Empty _ = Nothing
+wireDistanceToPoint (l :<| ls) p =
   case lineDistanceToPoint l p of
     Nothing -> fmap (lineLength l +) (wireDistanceToPoint ls p)
     Just d -> Just d
   where lineLength Line{start, finish} = distance start finish
 
-minimizedSumDistance :: [Line] -> [Line] -> Int
+minimizedSumDistance :: Wire -> Wire -> Int
 minimizedSumDistance w1 w2 =
   let intersections = wireIntersections w1 w2
       distances =
@@ -79,7 +81,7 @@ minimizedSumDistance w1 w2 =
 
 ------------------------------------PARSING------------------------------------
 
-parseWireStep :: ([Line], Point) -> Text -> ([Line], Point)
+parseWireStep :: (Wire, Point) -> Text -> (Wire, Point)
 parseWireStep (ls, p@Point{x,y}) t =
   let Just (c, rest) = T.uncons t
       d = read (T.unpack rest) :: Int
@@ -89,12 +91,12 @@ parseWireStep (ls, p@Point{x,y}) t =
              'D' -> p { y = y - d }
              'U' -> p { y = y + d }
       l = Line p p'
-   in (l:ls, p')
+   in (ls |> l, p')
 
-parseWire :: Text -> [Line]
-parseWire = reverse . fst . foldl' parseWireStep ([], origin) . T.splitOn ","
+parseWire :: Text -> Wire
+parseWire = fst . foldl' parseWireStep (Seq.empty, origin) . T.splitOn ","
 
-parseWirePair :: Text -> ([Line], [Line])
+parseWirePair :: Text -> (Wire, Wire)
 parseWirePair input = let (a:b:_) = T.splitOn "\n" input
                        in (parseWire a, parseWire b)
 
