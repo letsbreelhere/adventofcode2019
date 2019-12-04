@@ -20,11 +20,11 @@ data Point = Point { x :: Int, y :: Int }
 origin :: Point
 origin = Point 0 0
 
-data Line = Line { start :: Point, finish :: Point }
-  deriving (Show, Eq)
-
 distance :: Point -> Point -> Int
 distance p p' = abs (x p - x p') + abs (y p - y p')
+
+data Line = Line { start :: Point, finish :: Point }
+  deriving (Show, Eq)
 
 type Wire = Seq Line
 

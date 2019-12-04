@@ -9,7 +9,7 @@ fuelRequired :: Int -> Int
 fuelRequired = subtract 2 . (`div` 3)
 
 repeatingFuelRequired :: Int -> Int
-repeatingFuelRequired = sum . tail . takeWhile (>0) . iterate fuelRequired
+repeatingFuelRequired = sum . tail . takeWhile (> 0) . iterate fuelRequired
 
 main :: IO ()
 main = do
