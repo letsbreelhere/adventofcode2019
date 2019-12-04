@@ -1,19 +1,14 @@
 module DayFour where
 
-import Data.Foldable (Foldable, foldl')
-import Data.Maybe (isJust)
-
-monotonic' :: Ord a => a -> [a] -> Bool
-monotonic' y (x:xs) = y <= x && monotonic' x xs
-monotonic' _ [] = True
+import Data.List (group)
 
 monotonic :: Ord a => [a] -> Bool
 monotonic [] = True
-monotonic (x:xs) = monotonic' x xs
+monotonic xs = and $ zipWith (<=) xs (tail xs)
 
 adjacentEqual :: Eq a => [a] -> Bool
-adjacentEqual (x:x':xs) = x == x' || adjacentEqual (x' : xs)
-adjacentEqual _ = False
+adjacentEqual [] = False
+adjacentEqual xs = or $ zipWith (==) xs (tail xs)
 
 isValidPassword :: Int -> Bool
 isValidPassword x =
@@ -21,10 +16,7 @@ isValidPassword x =
   in monotonic ds && adjacentEqual ds
 
 containsDouble :: Eq a => [a] -> Bool
-containsDouble ys@(x:x':xs) =
-  let (ls, rs) = span (== x) ys
-  in length ls == 2 || containsDouble rs
-containsDouble _ = False
+containsDouble = any ((== 2) . length) . group
 
 isValidPassword' :: Int -> Bool
 isValidPassword' x =
