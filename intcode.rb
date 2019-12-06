@@ -34,14 +34,14 @@ class Intcode
   end
 
   def mode
-    ((ints[ip] - ints[ip] % 100) / 100).to_s.rjust(10, '0').reverse
+    ints[ip].to_s.gsub(/.?.$/, '').reverse
   end
 
   def step
     puts "opcode:#{opcode}, modes:#{mode}, ip:#{ip}" if @debug
 
     operands = (1..parameter_length).map do |i|
-      operand_mode = i > mode.length ? 0 : mode[i - 1]
+      operand_mode = mode[i - 1] || '0'
       parameter = ints[ip + i]
 
       case operand_mode
