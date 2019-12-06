@@ -3,8 +3,6 @@
 class Intcode
   attr_reader :ints, :ip, :halt, :outputs
 
-  UnknownOpcode = Struct.new(:opcode)
-
   def initialize(ints, inputs: [], debug: false)
     @ints = ints.dup
     @ip = 0
@@ -12,6 +10,30 @@ class Intcode
     @inputs = inputs
     @outputs = []
     @debug = debug
+  end
+
+  def run
+    step until halt
+  end
+
+  def output
+    run
+    ints[0]
+  end
+
+  private
+
+  def advance
+    @ip += parameter_length + 1
+  end
+
+  def mode
+    ints[ip].to_s.gsub(/.?.$/, '').reverse
+  end
+
+  def set(value)
+    result_index = ints[ip + parameter_length]
+    @ints[result_index] = value
   end
 
   def opcode
@@ -33,10 +55,6 @@ class Intcode
     end
   end
 
-  def mode
-    ints[ip].to_s.gsub(/.?.$/, '').reverse
-  end
-
   def step
     puts "opcode:#{opcode}, modes:#{mode}, ip:#{ip}" if @debug
 
@@ -56,15 +74,13 @@ class Intcode
 
     puts "operands: #{operands.inspect}" if @debug
 
-    result_index = ints[ip + parameter_length]
-
     case opcode
     when 1
-      @ints[result_index] = operands[0] + operands[1]
+      set(operands[0] + operands[1])
     when 2
-      @ints[result_index] = operands[0] * operands[1]
+      set(operands[0] * operands[1])
     when 3
-      @ints[result_index] = read_input
+      set(read_input)
     when 4
       @outputs += operands
     when 5
@@ -78,18 +94,16 @@ class Intcode
         return
       end
     when 7
-      result = operands[0] < operands[1] ? 1 : 0
-      @ints[result_index] = result
+      set(operands[0] < operands[1] ? 1 : 0)
     when 8
-      result = operands[0] == operands[1] ? 1 : 0
-      @ints[result_index] = result
+      set(operands[0] == operands[1] ? 1 : 0)
     when 99
       @halt = true
     else
       raise "Unknown opcode #{opcode}, ip: #{ip}"
     end
 
-    advance(parameter_length + 1)
+    advance
   end
 
   def read_input
@@ -97,20 +111,5 @@ class Intcode
     raise 'Out of input' unless res
 
     res
-  end
-
-  def run
-    step until halt
-  end
-
-  def output
-    run
-    ints[0]
-  end
-
-  private
-
-  def advance(n)
-    @ip += n
   end
 end
