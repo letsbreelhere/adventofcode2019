@@ -1,12 +1,14 @@
 # frozen_string_literal: true
 
 class Intcode
-  attr_reader :ints, :ip, :halt, :outputs
+  attr_reader :ints, :ip, :halt, :waiting, :inputs
+  attr_accessor :outputs
 
   def initialize(ints, inputs: [], debug: false)
     @ints = ints.dup
     @ip = 0
     @halt = false
+    @waiting = false
     @inputs = inputs
     @outputs = []
     @debug = debug
@@ -16,9 +18,23 @@ class Intcode
     step until halt
   end
 
+  def run_until_wait
+    @waiting = false
+    step until waiting || halt
+  end
+
+  # Only used for day 2
   def output
     run
     ints[0]
+  end
+
+  def take_output
+    @outputs.shift
+  end
+
+  def add_input(value)
+    @inputs << value
   end
 
   private
@@ -56,7 +72,9 @@ class Intcode
   end
 
   def step
-    puts "opcode:#{opcode}, modes:#{mode}, ip:#{ip}" if @debug
+    debug "opcode:#{opcode}, modes:#{mode}, ip:#{ip}"
+    debug "IN: #{@inputs}; OUT: #{@outputs}"
+    debug ''
 
     operands = (1..parameter_length).map do |i|
       operand_mode = mode[i - 1] || '0'
@@ -72,7 +90,7 @@ class Intcode
       end
     end
 
-    puts "operands: #{operands.inspect}" if @debug
+    debug "operands: #{operands.inspect}"
 
     case opcode
     when 1
@@ -80,7 +98,13 @@ class Intcode
     when 2
       set(operands[0] * operands[1])
     when 3
-      set(read_input)
+      input = read_input
+      if input
+        set(input)
+      else
+        debug 'Waiting on input'
+        return
+      end
     when 4
       @outputs += operands
     when 5
@@ -108,8 +132,12 @@ class Intcode
 
   def read_input
     res = @inputs.shift
-    raise 'Out of input' unless res
+    @waiting = !res
 
     res
+  end
+
+  def debug(str)
+    puts str if @debug
   end
 end
