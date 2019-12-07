@@ -14,8 +14,7 @@ class Tree
   def self.from_edges(edges)
     adj = {}
     edges.each do |parent, child|
-      adj[parent] ||= []
-      adj[parent] << child
+      adj[child] = parent
     end
 
     new(adj)
@@ -26,7 +25,7 @@ class Tree
   end
 
   def nodes
-    (edges.values.flatten + edges.keys).uniq
+    edges.keys
   end
 
   def distance_between(l, r)
@@ -37,8 +36,23 @@ class Tree
   private
 
   def least_upper_bound(l, r)
-    r_parents = Set.new(parents(r))
-    parents(l).find { |p| r_parents.include?(p) }
+    l_parents = parents(l)
+    r_parents = parents(r)
+    height = [l_parents.length, r_parents.length].max
+    visited = Set.new
+
+    height.times do |i|
+      l = l_parents[i]
+      r = r_parents[i]
+
+      return l if visited.include?(l)
+
+      visited << l if l
+
+      return r if visited.include?(r)
+
+      visited << r if r
+    end
   end
 
   def height_to(parent, child)
@@ -48,9 +62,9 @@ class Tree
   def parents(node)
     return @parents[node] if @parents[node]
 
-    parent = edges.find { |_, c| c.include?(node) }
+    parent = edges[node]
     @parents[node] = if parent
-                       [node] + parents(parent.first)
+                       [node] + parents(parent)
                      else
                        []
                      end
