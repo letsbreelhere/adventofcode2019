@@ -1,35 +1,13 @@
-{-# LANGUAGE NamedFieldPuns #-}
+module Main where
 
-module DaySix where
-
+import Safe
+import Data.Map (Map)
+import Data.Maybe (maybe)
 import Data.List
-import Debug.Trace
+import Data.Tuple
+import qualified Data.Map as M
 
-data Tree a
-  = Top [Tree a]
-  | Tree { tip :: a
-         , children :: [Tree a] }
-
-instance Show a => Show (Tree a) where
-  show (Tree x []) = show x
-  show (Tree x xs) = show x ++ " -> (" ++ intercalate ", " (map show xs) ++ ")"
-  show (Top xs) = "! -> (" ++ intercalate ", " (map show xs) ++ ")"
-
-contains :: Eq a => a -> Tree a -> Bool
-contains x (Top ts) = any (contains x) ts
-contains x Tree{tip, children} = x == tip || any (contains x) children
-
-addEdge :: Eq a => a -> a -> Tree a -> Tree a
-addEdge p c t@Tree {tip, children}
-  | p == tip =
-    let child = Tree c []
-    in Tree tip (children ++ [child])
-  | c == tip = Tree p [t]
-  | any (contains p) children || any (contains c) children = Tree tip (map (addEdge p c) children)
-  | otherwise = t
-addEdge p c (Top ts)
-  | any (contains p) ts || any (contains c) ts = Top (map (addEdge p c) ts)
-  | otherwise = Top (ts ++ [Tree p [Tree c []]])
+type Tree = Map String String
 
 split' :: Eq a => [a] -> a -> [a] -> ([a], [a])
 split' ls c [] = (ls, [])
@@ -42,22 +20,42 @@ split = split' []
 edges :: String -> [(String, String)]
 edges = map (split ')') . lines
 
-parseTree :: String -> Tree String
-parseTree input =
-  let pairs = edges input
-      top = fst (head pairs)
-  in foldl' (\t (p, c) -> addEdge p c t) (Top []) pairs
+parseTree :: String -> Tree
+parseTree = M.fromList . map swap . edges
 
-totalHeights :: Show a => Int -> Tree a -> Int
-totalHeights h (Top ts) = sum . map (totalHeights h) $ ts
-totalHeights h Tree{tip, children} = traceShow (tip, h) f
-  where f = let total = sum . map (totalHeights (h+1)) $ children
-             in h + total
+parentsOf :: Tree -> String -> [String]
+parentsOf t s =
+  case M.lookup s t of
+    Nothing -> []
+    Just p -> p : parentsOf t p
+
+heightOf :: Tree -> String -> Int
+heightOf t = length . parentsOf t
+
+heightTo :: Tree -> String -> String -> Maybe Int
+heightTo t root child
+  | root == child = Just 0
+  | otherwise = do
+    p <- M.lookup child t
+    (1 +) <$> heightTo t root p
+
+leastUpperBound :: Tree -> String -> String -> Maybe String
+leastUpperBound t l r =
+  let lParents = parentsOf t l
+      rParents = parentsOf t r
+   in headMay (lParents `intersect` rParents)
+
+distanceBetween :: Tree -> String -> String -> Maybe Int
+distanceBetween t l r = do
+  lub <- leastUpperBound t l r
+  lh <- heightTo t lub l
+  rh <- heightTo t lub r
+  pure (lh + rh)
 
 main :: IO ()
 main = do
-  input <- parseTree <$> readFile "6sample.txt"
+  t <- parseTree <$> readFile "6.txt"
   -- Part 1
-  print input
-  --print (totalHeights 0 input)
+  print . sum . map (heightOf t) $ M.keys t
   -- Part 2
+  print . fmap (subtract 2) $ distanceBetween t "YOU" "SAN"
