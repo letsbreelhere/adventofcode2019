@@ -23,7 +23,7 @@ count :: Int -> Layer Pixel -> Int
 count d = length . filter (== Pixel d)
 
 groupPixels :: Image -> Layer Pixel
-groupPixels = foldl (zipWith (<>)) (repeat (Pixel 2))
+groupPixels = foldr (zipWith (<>)) (repeat (Pixel 2))
 
 draw :: Int -> Layer Pixel -> String
 draw width = unlines . chunksOf width . map renderChar
@@ -40,3 +40,5 @@ main = do
       rendered = groupPixels im
   -- Part 1
   print $ count 1 l * count 2 l
+  -- Part 2
+  putStrLn (draw 25 rendered)
