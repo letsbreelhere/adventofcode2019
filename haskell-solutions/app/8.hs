@@ -1,48 +1,42 @@
-{-# LANGUAGE DeriveFunctor #-}
-
 module Main where
 
-import Data.List
-import Data.List.Split (chunksOf, splitOn)
-import Data.Maybe
-import Data.Ord
-import Debug.Trace
+import Data.List (minimumBy)
+import Data.List.Split (chunksOf)
+import Data.Ord (comparing)
 
-type Layer a = [[a]]
+type Layer a = [a]
 
-type Image = [Layer Int]
+type Image = [Layer Pixel]
+
+newtype Pixel =
+  Pixel Int
+  deriving (Eq, Num)
+
+instance Semigroup Pixel where
+  2 <> p = p
+  p <> _ = p
 
 image :: Int -> Int -> [Int] -> Image
-image width height ps =
-  let area = width * height
-  in map (chunksOf width) (chunksOf area ps)
+image width height = chunksOf (width * height) . map Pixel
 
-count :: Int -> Layer Int -> Int
-count d = length . filter (== d) . concat
+count :: Int -> Layer Pixel -> Int
+count d = length . filter (== Pixel d)
 
-pixel :: [Int] -> Int
-pixel = fromMaybe 2 . find (/= 2)
+groupPixels :: Image -> Layer Pixel
+groupPixels = foldl (zipWith (<>)) (repeat (Pixel 2))
 
-groupPixels :: Image -> Layer [Int]
-groupPixels ls =
-  let ls' = map (map (map (: []))) ls
-      merge = zipWith (zipWith (++))
-  in foldl merge (repeat (repeat [])) ls'
-
-draw :: [[Int]] -> String
-draw = unlines . map renderRow
+draw :: Int -> Layer Pixel -> String
+draw width = unlines . chunksOf width . map renderChar
   where
-    renderRow =
-      map $ \case
-        0 -> ' '
+    renderChar =
+      \case
         1 -> '█'
+        _ -> ' '
 
 main = do
   ps <- map (: []) . init <$> getContents
   let im = image 25 6 (map read ps)
       l = minimumBy (comparing (count 0)) im
-      rendered = map (map pixel) . groupPixels $ im
+      rendered = groupPixels im
   -- Part 1
   print $ count 1 l * count 2 l
-  -- Part 2
-  putStrLn (draw rendered)
