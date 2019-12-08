@@ -1,6 +1,3 @@
-{-# LANGUAGE TemplateHaskell, GeneralizedNewtypeDeriving,
-  LambdaCase #-}
-
 module Intcode where
 
 import Control.Lens ((%=), (+=), (.=), (.~), makeLenses, use)

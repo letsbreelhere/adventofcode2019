@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f4222eabcfde49b4381da5b270b57bdbefd83d34750fb17f94bf62f337686abf
+-- hash: 57b6f63c25ad29eace86b6829c0d0ab30ac78e7e2c9872c070b5e485555896ea
 
 name:           advent-solutions
 version:        0.1.0.0
@@ -30,11 +30,13 @@ library
       Paths_advent_solutions
   hs-source-dirs:
       src
+  default-extensions: OverloadedStrings GeneralizedNewtypeDeriving TemplateHaskell LambdaCase
   build-depends:
       base >=4.7 && <5
     , containers
     , lens
     , mtl
+    , split
     , text
     , vector
   default-language: Haskell2010
@@ -45,6 +47,7 @@ executable 5
       Paths_advent_solutions
   hs-source-dirs:
       app
+  default-extensions: OverloadedStrings GeneralizedNewtypeDeriving TemplateHaskell LambdaCase
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       advent-solutions
@@ -52,6 +55,26 @@ executable 5
     , containers
     , lens
     , mtl
+    , split
+    , text
+    , vector
+  default-language: Haskell2010
+
+executable 8
+  main-is: 8.hs
+  other-modules:
+      Paths_advent_solutions
+  hs-source-dirs:
+      app
+  default-extensions: OverloadedStrings GeneralizedNewtypeDeriving TemplateHaskell LambdaCase
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      advent-solutions
+    , base >=4.7 && <5
+    , containers
+    , lens
+    , mtl
+    , split
     , text
     , vector
   default-language: Haskell2010
