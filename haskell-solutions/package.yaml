@@ -1,0 +1,31 @@
+name:                advent-solutions
+version:             0.1.0.0
+github:              "letsbreelhere/advent2019"
+license:             BSD3
+author:              "Bree Elle Gardner"
+maintainer:          "letsbreelhere@gmail.com"
+copyright:           "2019 Bree Elle Gardner"
+
+description: "AoC 2019 solutions"
+
+dependencies:
+- base >= 4.7 && < 5
+- lens
+- mtl
+- vector
+- containers
+- text
+
+library:
+  source-dirs: src
+
+executables:
+  5:
+    main:                5.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - advent-solutions
