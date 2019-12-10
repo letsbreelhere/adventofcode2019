@@ -7,9 +7,10 @@ import Data.Functor
 import Data.List (intercalate)
 import Data.Sequence (Seq, ViewL(..), (|>))
 import qualified Data.Sequence as Queue
-import Data.Vector (Vector, (!))
-import qualified Data.Vector as V
-import Data.Vector.Generic.Mutable (write)
+import Data.Map (Map, (!))
+import qualified Data.Map as M
+import qualified Data.Text as T
+import qualified Data.Text.IO as T
 
 type Queue a = Seq a
 
@@ -17,13 +18,14 @@ push :: a -> Queue a -> Queue a
 push = flip (|>)
 
 data ComputerState = ComputerState
-  { _code :: Vector Int
-  , _ip :: Int
+  { _code :: Map Integer Integer
+  , _ip :: Integer
   , _halted :: Bool
   , _waiting :: Bool
-  , _inputs :: Queue Int
-  , _outputs :: Queue Int
+  , _inputs :: Queue Integer
+  , _outputs :: Queue Integer
   , _debugOn :: Bool
+  , _relativeBase :: Integer
   }
 
 makeLenses ''ComputerState
@@ -35,6 +37,7 @@ newtype Intcode a = Intcode
 data Mode
   = Position
   | Immediate
+  | Relative
 
 debug :: String -> Intcode ()
 debug s = do
@@ -43,7 +46,7 @@ debug s = do
     then liftIO (putStrLn s)
     else pure ()
 
-computerState :: Vector Int -> ComputerState
+computerState :: Map Integer Integer -> ComputerState
 computerState code =
   ComputerState
   { _code = code
@@ -53,20 +56,21 @@ computerState code =
   , _inputs = Queue.empty
   , _outputs = Queue.empty
   , _debugOn = False
+  , _relativeBase = 0
   }
 
-fetch :: Int -> Intcode Int
+fetch :: Integer -> Intcode Integer
 fetch i = (! i) <$> use code
 
-fetchOffset :: Int -> Intcode Int
+fetchOffset :: Integer -> Intcode Integer
 fetchOffset offset = do
   i <- use ip
   fetch (i + offset)
 
-curInstruction :: Intcode Int
+curInstruction :: Intcode Integer
 curInstruction = fetchOffset 0
 
-opcode :: Intcode Int
+opcode :: Intcode Integer
 opcode = fmap (`mod` 100) curInstruction
 
 mode :: Intcode [Mode]
@@ -79,36 +83,38 @@ mode = do
       \case
         '0' -> Position
         '1' -> Immediate
+        '2' -> Relative
         d -> error ("Unrecognized mode " ++ [d])
 
-parameterLength :: Int -> Int
+parameterLength :: Integer -> Integer
 parameterLength opcode
   | opcode `elem` [1, 2, 7, 8] = 3
   | opcode `elem` [5, 6] = 2
-  | opcode `elem` [3, 4] = 1
+  | opcode `elem` [3, 4, 9] = 1
   | opcode == 99 = 0
   | otherwise = error ("Unknown opcode " ++ show opcode)
 
-withIndex :: [a] -> [(a, Int)]
+withIndex :: [a] -> [(a, Integer)]
 withIndex = flip zip [1 ..]
 
-operands :: Intcode [Int]
+operands :: Intcode [Integer]
 operands = do
   len <- parameterLength <$> opcode
   modesWithIndex <- withIndex <$> mode
-  forM (take len modesWithIndex) $ \(mode, i) -> do
+  forM (take (fromIntegral len) modesWithIndex) $ \(mode, i) -> do
     param <- fetchOffset i
     case mode of
       Immediate -> pure param
       Position -> fetch param
+      Relative -> fetch . (param +) =<< use relativeBase
 
-setResult :: Int -> Intcode ()
+setResult :: Integer -> Intcode ()
 setResult value = do
   len <- parameterLength <$> opcode
   resultIndex <- fetchOffset len
-  code %= V.modify (\v -> write v resultIndex value)
+  code %= M.insert resultIndex value
 
-readInput :: Intcode (Maybe Int)
+readInput :: Intcode (Maybe Integer)
 readInput = do
   is <- use inputs
   case Queue.viewl is of
@@ -117,7 +123,7 @@ readInput = do
       inputs .= is'
       pure (Just i)
 
-exec :: Int -> [Int] -> Intcode (Maybe Int)
+exec :: Integer -> [Integer] -> Intcode (Maybe Integer)
 exec opcode operands = do
   let nop = pure Nothing
       jumpTo = pure . Just
@@ -160,6 +166,7 @@ exec opcode operands = do
               then 1
               else 0) $>
          Nothing
+    9 -> let (i:_) = operands in (relativeBase += i) $> Nothing
     99 -> (halted .= True) $> Nothing
 
 step :: Intcode ()
@@ -185,5 +192,9 @@ run cs = do
   (_, cs') <- runStateT (runIntcode $ while (not <$> use halted) step) cs
   pure cs'
 
-runWithInput :: ComputerState -> [Int] -> IO ComputerState
+fromStdin :: IO ComputerState
+fromStdin =
+  fmap (computerState . M.fromList . zip [0..] . map (read . T.unpack) . T.splitOn ",") T.getContents
+
+runWithInput :: ComputerState -> [Integer] -> IO ComputerState
 runWithInput cs ins = run . (inputs .~ Queue.fromList ins) $ cs
