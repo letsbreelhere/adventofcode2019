@@ -3,10 +3,8 @@
 module Main where
 
 import Control.Monad
-import Data.List (maximumBy, sortOn)
+import Data.List ((\\), maximumBy, sortOn)
 import Data.Ord
-import Data.Set (Set, (\\))
-import qualified Data.Set as S
 
 data Point = P
   { x :: Int
@@ -14,7 +12,7 @@ data Point = P
   } deriving (Eq, Ord, Show)
 
 data Field = Field
-  { contents :: Set Point
+  { contents :: [Point]
   , width :: Int
   , height :: Int
   } deriving (Show)
@@ -29,7 +27,7 @@ between a a' x =
 -- functions.
 isVisible :: Field -> Point -> Point -> Bool
 isVisible Field {contents, width, height} p1 p2 =
-  let is = S.filter (onLine p1 p2) contents
+  let is = filter (onLine p1 p2) contents
   in not .
      any
        (\p ->
@@ -41,23 +39,19 @@ onLine :: Point -> Point -> Point -> Bool
 onLine (P a b) (P c d) (P x y) = y * (c - a) == (d - b) * (x - a) + b * (c - a)
 
 -- On a given field, what can p see?
-visiblePoints :: Field -> Point -> Set Point
+visiblePoints :: Field -> Point -> [Point]
 visiblePoints f@Field {contents} p =
-  S.filter (\p' -> p /= p' && isVisible f p p') contents
+  filter (\p' -> p /= p' && isVisible f p p') contents
 
 angle :: Point -> Point -> Float
 angle p p' = atan2 (fromIntegral $ y p' - y p) (fromIntegral $ x p' - x p)
-
-flipped :: Point -> Point
-flipped P {x, y} = P x (negate y)
 
 -- Because of the clockwise turning + flipping of the y axis, we have to
 -- transform provided points to normalize their angles for sorting.
 angle' :: Point -> Point -> Float
 angle' p1@(P ax ay) p2@(P bx by) =
-  let p1' = P (negate ay) ax
-      p2' = P (negate by) bx
-      a = angle p1' p2'
+  let transform P {x, y} = P (-y) x
+      a = angle (transform p1) (transform p2)
   in if a >= 0
        then a
        else 2 * pi + a
@@ -68,13 +62,12 @@ blast :: Field -> Point -> ([Point], Field)
 blast f@Field {contents} p =
   let vps = visiblePoints f p
       removed = contents \\ vps
-      sorted = sortOn (angle' p) (S.toList vps)
+      sorted = sortOn (angle' p) vps
   in (sorted, f {contents = removed})
 
 station :: Field -> Point
 station field =
-  maximumBy (comparing (S.size . visiblePoints field)) . S.toList . contents $
-  field
+  maximumBy (comparing (length . visiblePoints field)) . contents $ field
 
 blastingOrder :: Field -> [Point]
 blastingOrder field = go field (station field) []
@@ -86,10 +79,10 @@ blastingOrder field = go field (station field) []
            _ -> go f' p (xs ++ ps)
 
 mkField :: Int -> Int -> String -> Field
-mkField w h points = Field (foldr step S.empty (zip points [0 ..])) w h
+mkField w h points = Field (foldr step [] (zip points [0 ..])) w h
   where
     step ('.', _) s = s
-    step ('#', i) s = S.insert (P (i `mod` w) (i `div` w)) s
+    step ('#', i) s = P (i `mod` w) (i `div` w) : s
 
 main :: IO ()
 main = do
@@ -97,9 +90,7 @@ main = do
   let w = length (head grid)
       h = length grid
       field = mkField w h (concat grid)
-      part1 =
-        maximum . map (S.size . visiblePoints field) . S.toList . contents $
-        field
+      part1 = maximum . map (length . visiblePoints field) . contents $ field
   print part1
   let P {x, y} = blastingOrder field !! 199
       part2 = x * 100 + y
