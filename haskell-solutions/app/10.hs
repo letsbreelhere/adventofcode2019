@@ -14,7 +14,11 @@ data Point = P
   , y :: Int
   } deriving (Eq, Ord, Show)
 
+diff :: Point -> Point -> Point
 diff (P a b) (P c d) = P (a - c) (b - d)
+
+cross :: Point -> Point -> Int
+cross (P ax ay) (P bx by) = ax * by - ay * bx
 
 data Field = Field
   { contents :: [Point]
@@ -32,7 +36,7 @@ between a a' x =
 -- functions.
 isVisible :: Field -> Point -> Point -> Bool
 isVisible Field {contents, width, height} p1 p2 =
-  let is = filter (onLine p1 p2) contents
+  let is = filter (collinear p1 p2) contents
   in not .
      any
        (\p ->
@@ -40,31 +44,37 @@ isVisible Field {contents, width, height} p1 p2 =
           p /= p2 && between (x p1) (x p2) (x p) && between (y p1) (y p2) (y p)) $
      is
 
-onLine :: Point -> Point -> Point -> Bool
-onLine (P a b) (P c d) (P x y) = (x - a) * (d - b) == (y - b) * (c - a)
+collinear :: Point -> Point -> Point -> Bool
+collinear a b c = cross (diff a b) (diff a c) == 0
 
 -- On a given field, what can p see?
 visiblePoints :: Field -> Point -> [Point]
 visiblePoints f@Field {contents} p =
   filter (\p' -> p /= p' && isVisible f p p') contents
 
-data Dir = L | R
+data Dir
+  = L
+  | R
   deriving (Eq, Ord)
+
 data Slope
   = Vertical
-  | Slant Dir (Ratio Int)
+  | Slant Dir
+          (Ratio Int)
   deriving (Eq, Ord)
 
 slope P {x, y}
   | x == 0 = Vertical
-  | otherwise = Slant (if x < 0 then L else R) (y % x)
+  | otherwise =
+    Slant
+      (if x < 0
+         then L
+         else R)
+      (y % x)
 
 visiblePoints' :: Field -> Point -> Set Slope
 visiblePoints' f p =
   foldr (\p' -> S.insert (slope (diff p' p))) S.empty (contents f)
-
-cross :: Point -> Point -> Int
-cross (P ax ay) (P bx by) = ax * by - ay * bx
 
 compareAngle :: Point -> Point -> Point -> Ordering
 compareAngle c p p'
@@ -112,7 +122,7 @@ main = do
       h = length grid
       field = mkField w h (concat grid)
       s = station field
-      part1 = S.size . visiblePoints' field $ s
+      part1 = length . visiblePoints field $ s
   print part1
   let P {x, y} = blastingOrder field s !! 199
       part2 = x * 100 + y
