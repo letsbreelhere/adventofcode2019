@@ -2,11 +2,11 @@
 
 module Main where
 
-import Data.Ord
 import Control.Monad
-import Data.Set (Set)
+import Data.List (maximumBy, sortOn)
+import Data.Ord
+import Data.Set (Set, (\\))
 import qualified Data.Set as S
-import Data.List
 
 data Point = P
   { x :: Int
@@ -19,16 +19,6 @@ data Field = Field
   , height :: Int
   } deriving (Show)
 
--- Given two points, return all lattice points on the line they share within the
--- boundaries.
-latticePoints :: Point -> Point -> Int -> Int -> Set Point
-latticePoints (P a b) (P c d) maxX maxY =
-  S.fromList $ do
-    x <- [0 .. maxX]
-    y <- [0 .. maxY]
-    guard $ y * (c - a) == (d - b) * (x - a) + b * (c - a)
-    pure $ P x y
-
 between a a' x =
   let b = min a a'
       b' = max a a'
@@ -39,8 +29,7 @@ between a a' x =
 -- functions.
 isVisible :: Field -> Point -> Point -> Bool
 isVisible Field {contents, width, height} p1 p2 =
-  let lps = latticePoints p1 p2 width height
-      is = S.toList $ S.intersection lps contents
+  let is = S.filter (onLine p1 p2) contents
   in not .
      any
        (\p ->
@@ -48,10 +37,53 @@ isVisible Field {contents, width, height} p1 p2 =
           p /= p2 && between (x p1) (x p2) (x p) && between (y p1) (y p2) (y p)) $
      is
 
+onLine :: Point -> Point -> Point -> Bool
+onLine (P a b) (P c d) (P x y) = y * (c - a) == (d - b) * (x - a) + b * (c - a)
+
 -- On a given field, what can p see?
 visiblePoints :: Field -> Point -> Set Point
 visiblePoints f@Field {contents} p =
   S.filter (\p' -> p /= p' && isVisible f p p') contents
+
+angle :: Point -> Point -> Float
+angle p p' = atan2 (fromIntegral $ y p' - y p) (fromIntegral $ x p' - x p)
+
+flipped :: Point -> Point
+flipped P {x, y} = P x (negate y)
+
+-- Because of the clockwise turning + flipping of the y axis, we have to
+-- transform provided points to normalize their angles for sorting.
+angle' :: Point -> Point -> Float
+angle' p1@(P ax ay) p2@(P bx by) =
+  let p1' = P (negate ay) ax
+      p2' = P (negate by) bx
+      a = angle p1' p2'
+  in if a >= 0
+       then a
+       else 2 * pi + a
+
+-- Given a field f and point p, remove all points visible at p from f and return
+-- the removed points in angle-sorted order.
+blast :: Field -> Point -> ([Point], Field)
+blast f@Field {contents} p =
+  let vps = visiblePoints f p
+      removed = contents \\ vps
+      sorted = sortOn (angle' p) (S.toList vps)
+  in (sorted, f {contents = removed})
+
+station :: Field -> Point
+station field =
+  maximumBy (comparing (S.size . visiblePoints field)) . S.toList . contents $
+  field
+
+blastingOrder :: Field -> [Point]
+blastingOrder field = go field (station field) []
+  where
+    go f p xs =
+      let (ps, f') = blast f p
+      in case ps of
+           [] -> xs
+           _ -> go f' p (xs ++ ps)
 
 mkField :: Int -> Int -> String -> Field
 mkField w h points = Field (foldr step S.empty (zip points [0 ..])) w h
@@ -59,18 +91,16 @@ mkField w h points = Field (foldr step S.empty (zip points [0 ..])) w h
     step ('.', _) s = s
     step ('#', i) s = S.insert (P (i `mod` w) (i `div` w)) s
 
-angle :: Point -> Point -> Float
-angle p p' = if x p == x p'
-                then pi/2
-                else atan $ fromIntegral (y p' - y p) / fromIntegral (x p' - x p)
-
 main :: IO ()
 main = do
   grid <- lines <$> getContents
   let w = length (head grid)
       h = length grid
       field = mkField w h (concat grid)
-      part1 = maximum . map (S.size . visiblePoints field) . S.toList . contents $ field
+      part1 =
+        maximum . map (S.size . visiblePoints field) . S.toList . contents $
+        field
   print part1
-  let station = maximumBy (comparing (S.size . visiblePoints field)) . S.toList . contents $ field
-  pure ()
+  let P {x, y} = blastingOrder field !! 199
+      part2 = x * 100 + y
+  print part2
