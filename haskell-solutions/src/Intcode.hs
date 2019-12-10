@@ -6,8 +6,9 @@ import Control.Monad.State
 import Data.Functor
 import Data.List (intercalate)
 import Data.Sequence (Seq, ViewL(..), (|>))
+import Data.Maybe
 import qualified Data.Sequence as Queue
-import Data.Map (Map, (!))
+import Data.Map (Map)
 import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -38,6 +39,7 @@ data Mode
   = Position
   | Immediate
   | Relative
+  deriving (Show)
 
 debug :: String -> Intcode ()
 debug s = do
@@ -60,7 +62,7 @@ computerState code =
   }
 
 fetch :: Integer -> Intcode Integer
-fetch i = (! i) <$> use code
+fetch i = (fromMaybe 0 . M.lookup i) <$> use code
 
 fetchOffset :: Integer -> Intcode Integer
 fetchOffset offset = do
@@ -106,12 +108,24 @@ operands = do
     case mode of
       Immediate -> pure param
       Position -> fetch param
-      Relative -> fetch . (param +) =<< use relativeBase
+      Relative -> do
+        r <- use relativeBase
+        fetch (r + param)
 
 setResult :: Integer -> Intcode ()
 setResult value = do
   len <- parameterLength <$> opcode
-  resultIndex <- fetchOffset len
+  modeList <- mode
+  let m = modeList !! fromIntegral (len - 1)
+  resultIndex <- case m of
+    Immediate -> error "Invalid mode for result operand"
+    Position -> fetchOffset len
+    -- N.B. this assumes the last param is used to reference the result operand.
+    -- Could probably be refactored.
+    Relative -> do
+      r <- use relativeBase
+      i <- fetchOffset len
+      pure (r + i)
   code %= M.insert resultIndex value
 
 readInput :: Intcode (Maybe Integer)
@@ -136,7 +150,9 @@ exec opcode operands = do
       in setResult (l * r) $> Nothing
     3 -> do
       readInput >>= \case
-        Just inp -> setResult inp
+        Just inp -> do
+          debug ("Read input " ++ show inp)
+          setResult inp
         Nothing -> (waiting .= True)
       nop
     4 ->
@@ -166,15 +182,25 @@ exec opcode operands = do
               then 1
               else 0) $>
          Nothing
-    9 -> let (i:_) = operands in (relativeBase += i) $> Nothing
+    9 -> do
+      let (i:_) = operands
+      relativeBase += i
+      r <- use relativeBase
+      debug ("Relative base is now " ++ show r)
+      nop
     99 -> (halted .= True) $> Nothing
 
 step :: Intcode ()
 step = do
+  i <- use ip
   oc <- opcode
-  debug . concat $ ["opcode:", show oc]
+  inst <- curInstruction
   ops <- operands
-  debug . concat $ ["operands:", show ops]
+
+  let len = parameterLength oc
+  params <- mapM (\i -> fetchOffset i) [i+1..i+len]
+  debug . concat $ ["ip:", show i, ", instruction:", show inst, ", operands:", show ops, ", params:", show params]
+
   jmp <- exec oc ops
   case jmp of
     Just ix -> ip .= ix

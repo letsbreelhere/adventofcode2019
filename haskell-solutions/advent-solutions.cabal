@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 57b6f63c25ad29eace86b6829c0d0ab30ac78e7e2c9872c070b5e485555896ea
+-- hash: 89dffe9dea992686515bc9447d96261481cbe0b1b8115092774a0f83c03c4a9b
 
 name:           advent-solutions
 version:        0.1.0.0
@@ -29,10 +29,31 @@ library
   other-modules:
       Paths_advent_solutions
   hs-source-dirs:
+      app
       src
   default-extensions: OverloadedStrings GeneralizedNewtypeDeriving TemplateHaskell LambdaCase
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , containers
+    , lens
+    , mtl
+    , split
+    , text
+    , vector
+  default-language: Haskell2010
+
+executable 10
+  main-is: 10.hs
+  other-modules:
+      Paths_advent_solutions
+  hs-source-dirs:
+      app
+  default-extensions: OverloadedStrings GeneralizedNewtypeDeriving TemplateHaskell LambdaCase
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      advent-solutions
+    , base >=4.7 && <5
     , containers
     , lens
     , mtl
@@ -62,6 +83,25 @@ executable 5
 
 executable 8
   main-is: 8.hs
+  other-modules:
+      Paths_advent_solutions
+  hs-source-dirs:
+      app
+  default-extensions: OverloadedStrings GeneralizedNewtypeDeriving TemplateHaskell LambdaCase
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      advent-solutions
+    , base >=4.7 && <5
+    , containers
+    , lens
+    , mtl
+    , split
+    , text
+    , vector
+  default-language: Haskell2010
+
+executable 9
+  main-is: 9.hs
   other-modules:
       Paths_advent_solutions
   hs-source-dirs:

@@ -25,23 +25,26 @@ default-extensions:
   - GeneralizedNewtypeDeriving
   - TemplateHaskell
   - LambdaCase
+ghc-options:
+- -threaded
+- -rtsopts
+- -with-rtsopts=-N
+source-dirs: app
 
 executables:
   5:
     main:                5.hs
-    source-dirs:         app
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
     dependencies:
     - advent-solutions
   8:
     main:                8.hs
-    source-dirs:         app
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
+    dependencies:
+    - advent-solutions
+  9:
+    main:                9.hs
+    dependencies:
+    - advent-solutions
+  10:
+    main:                10.hs
     dependencies:
     - advent-solutions
