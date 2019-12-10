@@ -74,8 +74,8 @@ station :: Field -> Point
 station field =
   maximumBy (comparing (length . visiblePoints field)) . contents $ field
 
-blastingOrder :: Field -> [Point]
-blastingOrder field = go field (station field) []
+blastingOrder :: Field -> Point -> [Point]
+blastingOrder field s = go field s []
   where
     go f p xs =
       let (ps, f') = blast f p
@@ -95,8 +95,9 @@ main = do
   let w = length (head grid)
       h = length grid
       field = mkField w h (concat grid)
-      part1 = maximum . map (length . visiblePoints field) . contents $ field
+      s = station field
+      part1 = length . visiblePoints field $ s
   print part1
-  let P {x, y} = blastingOrder field !! 199
+  let P {x, y} = blastingOrder field s !! 199
       part2 = x * 100 + y
   print part2
