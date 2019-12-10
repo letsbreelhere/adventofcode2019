@@ -2,15 +2,19 @@
 
 module Main where
 
-import Data.Ratio
 import Control.Monad
 import Data.List ((\\), maximumBy, sortBy)
 import Data.Ord
+import Data.Ratio
+import Data.Set (Set)
+import qualified Data.Set as S
 
 data Point = P
   { x :: Int
   , y :: Int
   } deriving (Eq, Ord, Show)
+
+diff (P a b) (P c d) = P (a - c) (b - d)
 
 data Field = Field
   { contents :: [Point]
@@ -44,21 +48,32 @@ visiblePoints :: Field -> Point -> [Point]
 visiblePoints f@Field {contents} p =
   filter (\p' -> p /= p' && isVisible f p p') contents
 
+data Dir = L | R
+  deriving (Eq, Ord)
+data Slope
+  = Vertical
+  | Slant Dir (Ratio Int)
+  deriving (Eq, Ord)
+
+slope P {x, y}
+  | x == 0 = Vertical
+  | otherwise = Slant (if x < 0 then L else R) (y % x)
+
+visiblePoints' :: Field -> Point -> Set Slope
+visiblePoints' f p =
+  foldr (\p' -> S.insert (slope (diff p' p))) S.empty (contents f)
+
 cross :: Point -> Point -> Int
 cross (P ax ay) (P bx by) = ax * by - ay * bx
 
 compareAngle :: Point -> Point -> Point -> Ordering
-compareAngle (P cx cy) (P px py) (P px' py')
+compareAngle c p p'
   | da /= db = compare da db
   | ax == 0 && bx == 0 = signum ay `compare` signum by
   | otherwise = compare (signum (cross b a)) 0
   where
-    ax = px - cx
-    ay = py - cy
-    a = P ax ay
-    bx = px' - cx
-    by = py' - cy
-    b = P bx by
+    a@(P ax ay) = diff p c
+    b@(P bx by) = diff p' c
     da = ax < 0
     db = bx < 0
 
@@ -73,7 +88,7 @@ blast f@Field {contents} p =
 
 station :: Field -> Point
 station field =
-  maximumBy (comparing (length . visiblePoints field)) . contents $ field
+  maximumBy (comparing (S.size . visiblePoints' field)) . contents $ field
 
 blastingOrder :: Field -> Point -> [Point]
 blastingOrder field s = go field s []
@@ -97,7 +112,7 @@ main = do
       h = length grid
       field = mkField w h (concat grid)
       s = station field
-      part1 = length . visiblePoints field $ s
+      part1 = S.size . visiblePoints' field $ s
   print part1
   let P {x, y} = blastingOrder field s !! 199
       part2 = x * 100 + y
