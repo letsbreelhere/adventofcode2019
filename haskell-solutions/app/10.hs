@@ -2,6 +2,7 @@
 
 module Main where
 
+import Data.Ratio
 import Control.Monad
 import Data.List ((\\), maximumBy, sortBy)
 import Data.Ord
@@ -36,7 +37,7 @@ isVisible Field {contents, width, height} p1 p2 =
      is
 
 onLine :: Point -> Point -> Point -> Bool
-onLine (P a b) (P c d) (P x y) = y * (c - a) == (d - b) * (x - a) + b * (c - a)
+onLine (P a b) (P c d) (P x y) = (x - a) * (d - b) == (y - b) * (c - a)
 
 -- On a given field, what can p see?
 visiblePoints :: Field -> Point -> [Point]
