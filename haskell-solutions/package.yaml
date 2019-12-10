@@ -25,10 +25,6 @@ default-extensions:
   - GeneralizedNewtypeDeriving
   - TemplateHaskell
   - LambdaCase
-ghc-options:
-- -threaded
-- -rtsopts
-- -with-rtsopts=-N
 source-dirs: app
 
 executables:

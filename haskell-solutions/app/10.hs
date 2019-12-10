@@ -3,7 +3,7 @@
 module Main where
 
 import Control.Monad
-import Data.List ((\\), maximumBy, sortOn)
+import Data.List ((\\), maximumBy, sortBy)
 import Data.Ord
 
 data Point = P
@@ -43,18 +43,23 @@ visiblePoints :: Field -> Point -> [Point]
 visiblePoints f@Field {contents} p =
   filter (\p' -> p /= p' && isVisible f p p') contents
 
-angle :: Point -> Point -> Float
-angle p p' = atan2 (fromIntegral $ y p' - y p) (fromIntegral $ x p' - x p)
+cross :: Point -> Point -> Int
+cross (P ax ay) (P bx by) = ax * by - ay * bx
 
--- Because of the clockwise turning + flipping of the y axis, we have to
--- transform provided points to normalize their angles for sorting.
-angle' :: Point -> Point -> Float
-angle' p1@(P ax ay) p2@(P bx by) =
-  let transform P {x, y} = P (-y) x
-      a = angle (transform p1) (transform p2)
-  in if a >= 0
-       then a
-       else 2 * pi + a
+compareAngle :: Point -> Point -> Point -> Ordering
+compareAngle (P cx cy) (P px py) (P px' py')
+  | da /= db = compare da db
+  | ax == 0 && bx == 0 = signum ay `compare` signum by
+  | otherwise = compare (signum (cross b a)) 0
+  where
+    ax = px - cx
+    ay = py - cy
+    a = P ax ay
+    bx = px' - cx
+    by = py' - cy
+    b = P bx by
+    da = ax < 0
+    db = bx < 0
 
 -- Given a field f and point p, remove all points visible at p from f and return
 -- the removed points in angle-sorted order.
@@ -62,7 +67,7 @@ blast :: Field -> Point -> ([Point], Field)
 blast f@Field {contents} p =
   let vps = visiblePoints f p
       removed = contents \\ vps
-      sorted = sortOn (angle' p) vps
+      sorted = sortBy (compareAngle p) vps
   in (sorted, f {contents = removed})
 
 station :: Field -> Point
