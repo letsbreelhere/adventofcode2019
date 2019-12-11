@@ -1,15 +1,15 @@
 module Intcode where
 
-import Control.Lens ((%=), (+=), (.=), (.~), makeLenses, use)
+import Control.Lens ((%=), (+=), (.=), (.~), (%~), makeLenses, use)
 import Control.Monad.IO.Class
 import Control.Monad.State
 import Data.Functor
 import Data.List (intercalate)
-import Data.Sequence (Seq, ViewL(..), (|>))
-import Data.Maybe
-import qualified Data.Sequence as Queue
 import Data.Map (Map)
 import qualified Data.Map as M
+import Data.Maybe
+import Data.Sequence (Seq, ViewL(..), (|>), (><))
+import qualified Data.Sequence as Queue
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 
@@ -117,15 +117,16 @@ setResult value = do
   len <- parameterLength <$> opcode
   modeList <- mode
   let m = modeList !! fromIntegral (len - 1)
-  resultIndex <- case m of
-    Immediate -> error "Invalid mode for result operand"
-    Position -> fetchOffset len
+  resultIndex <-
+    case m of
+      Immediate -> error "Invalid mode for result operand"
+      Position -> fetchOffset len
     -- N.B. this assumes the last param is used to reference the result operand.
     -- Could probably be refactored.
-    Relative -> do
-      r <- use relativeBase
-      i <- fetchOffset len
-      pure (r + i)
+      Relative -> do
+        r <- use relativeBase
+        i <- fetchOffset len
+        pure (r + i)
   code %= M.insert resultIndex value
 
 readInput :: Intcode (Maybe Integer)
@@ -153,7 +154,7 @@ exec opcode operands = do
         Just inp -> do
           debug ("Read input " ++ show inp)
           setResult inp
-        Nothing -> (waiting .= True)
+        Nothing -> waiting .= True
       nop
     4 ->
       let (o:_) = operands
@@ -196,11 +197,18 @@ step = do
   oc <- opcode
   inst <- curInstruction
   ops <- operands
-
   let len = parameterLength oc
-  params <- mapM (\i -> fetchOffset i) [i+1..i+len]
-  debug . concat $ ["ip:", show i, ", instruction:", show inst, ", operands:", show ops, ", params:", show params]
-
+  params <- mapM fetchOffset [i + 1 .. i + len]
+  debug . concat $
+    [ "ip:"
+    , show i
+    , ", instruction:"
+    , show inst
+    , ", operands:"
+    , show ops
+    , ", params:"
+    , show params
+    ]
   jmp <- exec oc ops
   case jmp of
     Just ix -> ip .= ix
@@ -215,12 +223,34 @@ while mcond f = do
 
 run :: ComputerState -> IO ComputerState
 run cs = do
-  (_, cs') <- runStateT (runIntcode $ while (not <$> use halted) step) cs
+  (_, cs') <- runStateT (runIntcode $ while running step) cs{_waiting=False}
   pure cs'
+  where
+    running = do
+      h <- use halted
+      w <- use waiting
+      pure $ not (h || w)
+
+-- HACK for day 11, obviously.
+runUntilOutputLengthIs :: Int -> ComputerState -> IO ComputerState
+runUntilOutputLengthIs n cs = do
+  (_, cs') <- runStateT (runIntcode $ while running step) cs{_waiting=False}
+  pure cs'
+  where
+    running = do
+      h <- use halted
+      w <- use waiting
+      ol <- length <$> use outputs
+      pure $ not (h || w || ol == n)
+runWithInput' :: ComputerState -> [Integer] -> IO ComputerState
+runWithInput' cs ins = runUntilOutputLengthIs 2 . (inputs %~ (flip (><) (Queue.fromList ins))) $ cs
 
 fromStdin :: IO ComputerState
 fromStdin =
-  fmap (computerState . M.fromList . zip [0..] . map (read . T.unpack) . T.splitOn ",") T.getContents
+  fmap
+    (computerState .
+     M.fromList . zip [0 ..] . map (read . T.unpack) . T.splitOn ",")
+    T.getContents
 
 runWithInput :: ComputerState -> [Integer] -> IO ComputerState
-runWithInput cs ins = run . (inputs .~ Queue.fromList ins) $ cs
+runWithInput cs ins = run . (inputs %~ (flip (><) (Queue.fromList ins))) $ cs
