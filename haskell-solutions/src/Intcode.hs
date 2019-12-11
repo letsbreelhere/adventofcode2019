@@ -1,28 +1,31 @@
 module Intcode where
 
-import Control.Lens ((%=), (+=), (.=), (.~), (%~), makeLenses, use)
+import Control.Lens ((%=), (+=), (.=), (.~), (%~), (^.), makeLenses, use)
 import Control.Monad.IO.Class
 import Control.Monad.State
 import Data.Functor
 import Data.List (intercalate)
 import Data.Map (Map)
 import qualified Data.Map as M
-import Data.Maybe
 import Data.Sequence (Seq, ViewL(..), (|>), (><))
 import qualified Data.Sequence as Queue
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
+import Data.Maybe
+import Safe
 
 type Queue a = Seq a
 
 push :: a -> Queue a -> Queue a
 push = flip (|>)
 
+data Status = Running | Halted | AwaitingInput
+  deriving (Show, Eq)
+
 data ComputerState = ComputerState
   { _code :: Map Integer Integer
   , _ip :: Integer
-  , _halted :: Bool
-  , _waiting :: Bool
+  , _status :: Status
   , _inputs :: Queue Integer
   , _outputs :: Queue Integer
   , _debugOn :: Bool
@@ -53,8 +56,7 @@ computerState code =
   ComputerState
   { _code = code
   , _ip = 0
-  , _halted = False
-  , _waiting = False
+  , _status = Running
   , _inputs = Queue.empty
   , _outputs = Queue.empty
   , _debugOn = False
@@ -154,7 +156,7 @@ exec opcode operands = do
         Just inp -> do
           debug ("Read input " ++ show inp)
           setResult inp
-        Nothing -> waiting .= True
+        Nothing -> status .= AwaitingInput
       nop
     4 ->
       let (o:_) = operands
@@ -189,7 +191,7 @@ exec opcode operands = do
       r <- use relativeBase
       debug ("Relative base is now " ++ show r)
       nop
-    99 -> (halted .= True) $> Nothing
+    99 -> (status .= Halted) $> Nothing
 
 step :: Intcode ()
 step = do
@@ -222,28 +224,24 @@ while mcond f = do
     else pure ()
 
 run :: ComputerState -> IO ComputerState
-run cs = do
-  (_, cs') <- runStateT (runIntcode $ while running step) cs{_waiting=False}
-  pure cs'
+run = execStateT (runIntcode $ while running step) . (status .~ Running)
   where
-    running = do
-      h <- use halted
-      w <- use waiting
-      pure $ not (h || w)
+    running = (== Running) <$> use status
 
--- HACK for day 11, obviously.
-runUntilOutputLengthIs :: Int -> ComputerState -> IO ComputerState
-runUntilOutputLengthIs n cs = do
-  (_, cs') <- runStateT (runIntcode $ while running step) cs{_waiting=False}
-  pure cs'
+stepUntilOutput :: ComputerState -> IO ComputerState
+stepUntilOutput = execStateT (runIntcode $ while running step)
   where
     running = do
-      h <- use halted
-      w <- use waiting
-      ol <- length <$> use outputs
-      pure $ not (h || w || ol == n)
-runWithInput' :: ComputerState -> [Integer] -> IO ComputerState
-runWithInput' cs ins = runUntilOutputLengthIs 2 . (inputs %~ (flip (><) (Queue.fromList ins))) $ cs
+      r <- (== Running) <$> use status
+      noOutput <- null <$> use outputs
+      pure $ r && noOutput
+
+runUntilOutput :: ComputerState -> [Integer] -> IO (Maybe Integer, ComputerState)
+runUntilOutput cs ins = do
+  cs' <- stepUntilOutput cs{_inputs=Queue.fromList ins}
+  pure $ case Queue.viewl (cs' ^. outputs) of
+    (x:<_) -> (Just x, cs')
+    _ -> (Nothing, cs')
 
 fromStdin :: IO ComputerState
 fromStdin =

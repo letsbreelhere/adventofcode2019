@@ -76,25 +76,27 @@ colorSquare c = do
   p <- use pos
   hull %= M.insert p c
 
-loopUntilOutputs :: Robot (Maybe (Color, Turn))
-loopUntilOutputs = do
+curColor :: Robot Color
+curColor = do
   os <- toList <$> use (computer . outputs)
   p <- use pos
   curColor <- uses hull (M.lookup p)
-  let input = fromIntegral (fromEnum (fromMaybe Black curColor))
+  pure $ fromMaybe Black curColor
+
+loopUntilOutput :: Robot (Maybe Integer)
+loopUntilOutput = do
   cs <- use computer
-  cs' <- liftIO $ runWithInput' cs [input]
+  input <- fromIntegral . fromEnum <$> curColor
+  (mout, cs') <- liftIO $ runUntilOutput cs [input]
   computer .= cs'
-  if cs' ^. halted
-    then pure Nothing
-    else do
-      os <- toList <$> use (computer . outputs)
-      case os of
-        [] -> loopUntilOutputs
-        [c, t] -> do
-          computer . outputs .= Queue.empty
-          pure . Just $ (toEnum (fromIntegral c), toEnum (fromIntegral t))
-        _ -> error (show os)
+  case cs' ^. status of
+    Halted -> pure Nothing
+    AwaitingInput -> do
+      computer.status .= Running
+      loopUntilOutput
+    Running ->  do
+      computer . outputs .= Queue.empty
+      pure mout
 
 pairs :: [a] -> [(a, a)]
 pairs [] = []
@@ -102,19 +104,20 @@ pairs (x:y:xs) = (x, y) : pairs xs
 
 stepRobot :: Robot ()
 stepRobot = do
-  maybeOut <- loopUntilOutputs
-  case maybeOut of
-    Just (color, turn) -> do
-      colorSquare color
-      turnAndMove turn
+  mc <- loopUntilOutput
+  case mc of
     Nothing -> pure ()
+    Just color  -> do
+      Just turn <- loopUntilOutput
+      colorSquare (toEnum . fromIntegral $ color)
+      turnAndMove (toEnum . fromIntegral $ turn)
 
 runRobot :: RobotState -> IO RobotState
 runRobot = execStateT go
   where
     go = do
-      h <- use (computer . halted)
-      if h
+      s <- use (computer . status)
+      if s == Halted
         then pure ()
         else stepRobot >> go
 

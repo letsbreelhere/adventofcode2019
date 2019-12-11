@@ -16,6 +16,7 @@ dependencies:
 - containers
 - text
 - split
+- safe
 
 library:
   source-dirs: src
