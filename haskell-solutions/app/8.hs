@@ -2,36 +2,42 @@ module Main where
 
 import Data.List (minimumBy)
 import Data.List.Split (chunksOf)
+import Data.Maybe
+import Data.Monoid
 import Data.Ord (comparing)
 
-newtype Pixel =
-  Pixel Int
-  deriving (Eq, Num)
+data Color
+  = Black
+  | White
+  deriving (Eq)
 
-instance Semigroup Pixel where
-  2 <> p = p
-  p <> _ = p
+type Pixel = First Color
 
 image :: Int -> Int -> [Int] -> [[Pixel]]
-image width height = chunksOf (width * height) . map Pixel
+image width height = chunksOf (width * height) . map pixel
+  where
+    pixel 0 = pure Black
+    pixel 1 = pure White
+    pixel 2 = mempty
 
-count :: Int -> [Pixel] -> Int
-count d = length . filter (== Pixel d)
+count :: Maybe Color -> [Pixel] -> Int
+count c = length . filter (== First c)
 
 groupPixels :: [[Pixel]] -> [Pixel]
-groupPixels = foldr (zipWith (<>)) (repeat 2)
+groupPixels = foldr (zipWith mappend) (repeat mempty)
 
 draw :: Int -> [Pixel] -> String
-draw width = unlines . chunksOf width . map renderChar
+draw width =
+  unlines . chunksOf width . map (renderChar . fromMaybe Black . getFirst)
   where
-    renderChar 1 = '█'
+    renderChar White = '█'
     renderChar _ = ' '
 
 main = do
   ps <- map (: []) . init <$> getContents
   let im = image 25 6 (map read ps)
-      l = minimumBy (comparing (count 0)) im
+      l = minimumBy (comparing (count (Just Black))) im
   -- Part 1
-  print $ count 1 l * count 2 l
+  print $ count (Just White) l * count Nothing l
   -- Part 2
   putStr . draw 25 . groupPixels $ im
