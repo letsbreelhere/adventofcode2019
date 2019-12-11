@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 module Intcode where
 
 import Control.Lens ((%=), (+=), (.=), (.~), (%~), (^.), makeLenses, use)
@@ -67,9 +68,7 @@ fetch :: Integer -> Intcode Integer
 fetch i = (fromMaybe 0 . M.lookup i) <$> use code
 
 fetchOffset :: Integer -> Intcode Integer
-fetchOffset offset = do
-  i <- use ip
-  fetch (i + offset)
+fetchOffset offset = use ip >>= pure . (+ offset) >>= fetch
 
 curInstruction :: Intcode Integer
 curInstruction = fetchOffset 0
@@ -98,15 +97,15 @@ parameterLength opcode
   | opcode == 99 = 0
   | otherwise = error ("Unknown opcode " ++ show opcode)
 
-withIndex :: [a] -> [(a, Integer)]
-withIndex = flip zip [1 ..]
+withIndex :: [a] -> [(Integer, a)]
+withIndex = zip [0 ..]
 
 operands :: Intcode [Integer]
 operands = do
   len <- parameterLength <$> opcode
   modesWithIndex <- withIndex <$> mode
-  forM (take (fromIntegral len) modesWithIndex) $ \(mode, i) -> do
-    param <- fetchOffset i
+  forM (take (fromIntegral len) modesWithIndex) $ \(i, mode) -> do
+    param <- fetchOffset (i + 1)
     case mode of
       Immediate -> pure param
       Position -> fetch param
@@ -173,18 +172,10 @@ exec opcode operands = do
            else nop
     7 ->
       let (l:r:_) = operands
-      in setResult
-           (if l < r
-              then 1
-              else 0) $>
-         Nothing
+      in setResult (fromIntegral $ fromEnum (l < r)) $> Nothing
     8 ->
       let (l:r:_) = operands
-      in setResult
-           (if l == r
-              then 1
-              else 0) $>
-         Nothing
+       in setResult (fromIntegral $ fromEnum (l == r)) $> Nothing
     9 -> do
       let (i:_) = operands
       relativeBase += i
@@ -236,19 +227,19 @@ stepUntilOutput = execStateT (runIntcode $ while running step)
       noOutput <- null <$> use outputs
       pure $ r && noOutput
 
-runUntilOutput :: ComputerState -> [Integer] -> IO (Maybe Integer, ComputerState)
-runUntilOutput cs ins = do
-  cs' <- stepUntilOutput cs{_inputs=Queue.fromList ins}
+runUntilOutput :: [Integer] -> ComputerState -> IO (Maybe Integer, ComputerState)
+runUntilOutput (Queue.fromList -> ins) cs = do
+  cs' <- stepUntilOutput cs{_inputs=ins}
   pure $ case Queue.viewl (cs' ^. outputs) of
-    (x:<_) -> (Just x, cs')
+    (x:<_) -> (Just x, cs'{_outputs=Queue.empty})
     _ -> (Nothing, cs')
 
 fromStdin :: IO ComputerState
 fromStdin =
   fmap
     (computerState .
-     M.fromList . zip [0 ..] . map (read . T.unpack) . T.splitOn ",")
+     M.fromList . withIndex . map (read . T.unpack) . T.splitOn ",")
     T.getContents
 
-runWithInput :: ComputerState -> [Integer] -> IO ComputerState
-runWithInput cs ins = run . (inputs %~ (flip (><) (Queue.fromList ins))) $ cs
+runWithInput :: [Integer] -> ComputerState -> IO ComputerState
+runWithInput ins = run . (inputs %~ (>< Queue.fromList ins))

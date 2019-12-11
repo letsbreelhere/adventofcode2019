@@ -85,18 +85,15 @@ curColor = do
 
 loopUntilOutput :: Robot (Maybe Integer)
 loopUntilOutput = do
-  cs <- use computer
   input <- fromIntegral . fromEnum <$> curColor
-  (mout, cs') <- liftIO $ runUntilOutput cs [input]
+  (mout, cs') <- liftIO . runUntilOutput [input] =<< use computer
   computer .= cs'
   case cs' ^. status of
     Halted -> pure Nothing
     AwaitingInput -> do
       computer.status .= Running
       loopUntilOutput
-    Running ->  do
-      computer . outputs .= Queue.empty
-      pure mout
+    Running -> pure mout
 
 pairs :: [a] -> [(a, a)]
 pairs [] = []
@@ -135,11 +132,10 @@ bounds h =
 
 showHull :: Hull -> [String]
 showHull h =
-  let h' = M.filter (== White) h
-      (P x1 y1, P x2 y2) = bounds h'
+  let (P x1 y1, P x2 y2) = bounds h
       row ry = do
         rx <- [x1 .. x2]
-        case M.lookup (P rx ry) h' of
+        case M.lookup (P rx ry) h of
           Just White -> "█"
           _ -> " "
   in map row [y2,y2 - 1 .. y1]
