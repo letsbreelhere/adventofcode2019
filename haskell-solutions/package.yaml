@@ -17,6 +17,7 @@ dependencies:
 - text
 - split
 - safe
+- linear
 
 library:
   source-dirs: src
@@ -47,5 +48,9 @@ executables:
     - advent-solutions
   11:
     main:                11.hs
+    dependencies:
+    - advent-solutions
+  12:
+    main:                12.hs
     dependencies:
     - advent-solutions
