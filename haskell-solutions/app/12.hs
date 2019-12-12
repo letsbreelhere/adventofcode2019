@@ -25,8 +25,7 @@ mkMoon p = Moon p (V3 0 0 0)
 velocityDeltaAt :: Int -> Universe -> Point
 velocityDeltaAt i ms =
   let m = ms !! i
-      ms' = take i ms ++ drop (i + 1) ms
-      deltas = map (\m' -> signum (m' ^. pos - m ^. pos)) ms'
+      deltas = map (\m' -> signum (m' ^. pos - m ^. pos)) ms
   in sum deltas
 
 step :: Universe -> Universe
