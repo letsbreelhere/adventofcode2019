@@ -22,15 +22,12 @@ type Universe = [Moon]
 mkMoon :: Point -> Moon
 mkMoon p = Moon p (V3 0 0 0)
 
-velocityDeltaAt :: Int -> Universe -> Point
-velocityDeltaAt i ms =
-  let m = ms !! i
-      deltas = map (\m' -> signum (m' ^. pos - m ^. pos)) ms
-  in sum deltas
+velocityDeltaAt :: Moon -> Universe -> Point
+velocityDeltaAt m = sum . map (\m' -> signum (m' ^. pos - m ^. pos))
 
 step :: Universe -> Universe
 step ms =
-  let ds = map (`velocityDeltaAt` ms) [0 .. length ms]
+  let ds = map (`velocityDeltaAt` ms) ms
       ms' = zipWith (\m d -> m & vel +~ d) ms ds
   in map
        (\m ->
@@ -65,7 +62,8 @@ periodOf = go S.empty 0
 
 stepAxes :: Getting Int (V3 Int) Int -> [[(Int, Int)]]
 stepAxes l = map (map (get l)) (iterate step input)
-  where get l m = (m ^. vel . l, m ^. pos . l)
+  where
+    get l m = (m ^. vel . l, m ^. pos . l)
 
 main :: IO ()
 main = do
