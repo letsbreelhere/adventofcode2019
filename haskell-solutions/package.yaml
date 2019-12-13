@@ -18,6 +18,7 @@ dependencies:
 - split
 - safe
 - linear
+- ansi-terminal
 
 library:
   source-dirs: src
