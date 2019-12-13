@@ -204,9 +204,12 @@ step = do
     , show params
     ]
   jmp <- exec oc ops
-  case jmp of
-    Just ix -> ip .= ix
-    Nothing -> ip += (parameterLength oc + 1)
+  waiting <- (AwaitingInput ==) <$> use status
+  if waiting
+     then pure ()
+     else case jmp of
+            Just ix -> ip .= ix
+            Nothing -> ip += (parameterLength oc + 1)
 
 while :: Intcode Bool -> Intcode () -> Intcode ()
 while mcond f = do
