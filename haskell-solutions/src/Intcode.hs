@@ -11,6 +11,7 @@ import qualified Data.Map as M
 import Data.Sequence (Seq, ViewL(..), (|>), (><))
 import qualified Data.Sequence as Queue
 import qualified Data.Text as T
+import Data.Text (Text)
 import qualified Data.Text.IO as T
 import Data.Maybe
 import Safe
@@ -219,6 +220,9 @@ run = execStateT (runIntcode $ while running step) . (status .~ Running)
   where
     running = (== Running) <$> use status
 
+step' :: ComputerState -> IO ComputerState
+step' = execStateT (runIntcode step)
+
 stepUntilOutput :: ComputerState -> IO ComputerState
 stepUntilOutput = execStateT (runIntcode $ while running step)
   where
@@ -235,11 +239,13 @@ runUntilOutput (Queue.fromList -> ins) cs = do
     _ -> (Nothing, cs')
 
 fromStdin :: IO ComputerState
-fromStdin =
-  fmap
-    (computerState .
-     M.fromList . withIndex . map (read . T.unpack) . T.splitOn ",")
-    T.getContents
+fromStdin = fromString <$> T.getContents
+
+fromFile :: FilePath -> IO ComputerState
+fromFile = fmap fromString . T.readFile
+
+fromString :: Text -> ComputerState
+fromString = computerState . M.fromList . withIndex . map (read . T.unpack) . T.splitOn ","
 
 runWithInput :: [Integer] -> ComputerState -> IO ComputerState
 runWithInput ins = run . (inputs %~ (>< Queue.fromList ins))
