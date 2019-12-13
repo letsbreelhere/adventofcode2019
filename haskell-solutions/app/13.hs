@@ -1,13 +1,13 @@
+import Control.Concurrent
 import Control.Lens hiding (Empty)
 import Data.Foldable
 import Data.List.Split (chunksOf)
 import Data.Map (Map)
-import Data.Maybe
 import qualified Data.Map as M
+import Data.Maybe
 import Intcode
 import Linear.V2
 import System.Console.ANSI
-import Control.Concurrent
 
 data Tile
   = Empty
@@ -28,6 +28,12 @@ toTiles = M.fromList . mapMaybe parseTriple . chunksOf 3
       | x >= 0 = Just (V2 x y, toEnum (fromIntegral t))
       | otherwise = Nothing
 
+getScores :: [Integer] -> [Integer]
+getScores = mapMaybe parseTriple . chunksOf 3
+  where
+    parseTriple [-1, 0, s] = Just s
+    parseTriple _ = Nothing
+
 bounds :: Board -> (Point, Point)
 bounds b =
   let ps = M.keys b
@@ -43,46 +49,47 @@ render board =
       row ry = do
         rx <- [x1 .. x2]
         case M.lookup (V2 rx ry) board of
-          Just Ball -> "o"
-          Just Paddle -> "="
-          Just Block -> "█"
+          Just Ball -> "●"
+          Just Paddle -> "▭"
+          Just Block -> "▒"
+          Just Wall -> "█"
           _ -> " "
   in unlines $ map row [y1 .. y2]
 
+positionOf :: Tile -> Map a Tile -> a
+positionOf t b =
+  let Just (p, _) = find ((== t) . snd) . M.toList $ b
+  in p
+
 paddlePos :: Board -> Point
-paddlePos b =
-  let Just (p, _) = find ((== Paddle) . snd) . M.toList $ b
-   in p
+paddlePos = positionOf Paddle
 
 ballPos :: Board -> Point
-ballPos b =
-  let Just (p, _) = find ((== Ball) . snd) . M.toList $ b
-   in p
+ballPos = positionOf Ball
 
 followBall :: Board -> Integer
-followBall board =
-  let V2 bx by = ballPos board
-      V2 px py = paddlePos board
-   in signum (bx - px)
+followBall board = signum . view _x $ ballPos board - paddlePos board
 
-getScores :: [Integer] -> [Integer]
-getScores = mapMaybe parseTriple . chunksOf 3
-  where parseTriple [-1, 0, s] = Just s
-        parseTriple _ = Nothing
-
-go :: ComputerState -> IO ()
-go cs = do
+findHighScore :: ComputerState -> IO (Maybe Integer)
+findHighScore cs = do
   let board = toTiles . toList . view outputs $ cs
-      scores = getScores . toList . view outputs $ cs
       nextIn = followBall board
-      blocksLeft = M.size . M.filter (== Block) . toTiles . toList . view outputs $ cs
-  if not $ null scores then print (last scores) else pure ()
-  if cs^.status == Halted
-     then pure ()
-     else do
-            cs' <- runWithInput [nextIn] cs
-            go cs'
+      score = lastMay . getScores . toList . view outputs $ cs
+  -- If you want it pretty and slow af:
+  --clearScreen
+  --putStr "Score: "
+  --print (fromMaybe 0 score)
+  --putStrLn (render board)
+  --threadDelay 50000
+  if cs ^. status == Halted
+    then pure score
+    else findHighScore =<< runWithInput [nextIn] cs
 
+lastMay :: [a] -> Maybe a
+lastMay [] = Nothing
+lastMay xs = Just (last xs)
+
+main :: IO ()
 main = do
   cs <- fromFile "../13.txt"
   part1Cs <- runWithInput [] cs
@@ -90,5 +97,7 @@ main = do
         M.size . M.filter (== Block) . toTiles . toList . view outputs $ part1Cs
   print part1
   let csWithQuarters = (code %~ M.insert 0 2) cs
+  -- Run it one step so we have a screen to start with
   cs' <- runWithInput [] csWithQuarters
-  go cs'
+  Just part2 <- findHighScore cs'
+  print part2

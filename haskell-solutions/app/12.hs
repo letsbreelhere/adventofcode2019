@@ -1,3 +1,5 @@
+{-# LANGUAGE Rank2Types #-}
+
 module Main where
 
 import Control.Lens
@@ -60,7 +62,7 @@ periodOf = go S.empty 0
         then n
         else go (S.insert x m) (n + 1) xs
 
-stepAxes :: Getting Int (V3 Int) Int -> [[(Int, Int)]]
+stepAxes :: Getter (V3 Int) Int -> [[(Int, Int)]]
 stepAxes l = map (map (get l)) (iterate step input)
   where
     get l m = (m ^. vel . l, m ^. pos . l)
