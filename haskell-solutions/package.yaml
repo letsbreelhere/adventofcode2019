@@ -64,3 +64,7 @@ executables:
     main:                14.hs
     dependencies:
     - advent-solutions
+  16:
+    main:                16.hs
+    dependencies:
+    - advent-solutions
