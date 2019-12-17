@@ -1,5 +1,6 @@
 module Main where
 
+import Data.List
 import Intcode
 import Data.Maybe
 import Data.Map (Map)
@@ -11,6 +12,7 @@ import Control.Lens
 import System.IO
 import Data.Set (Set)
 import qualified Data.Set as S
+import Safe
 
 data Dir = N | S | W | E
   deriving (Show, Eq, Ord)
@@ -147,11 +149,11 @@ availableNeighbors = flip filterM [N, S, E, W] $ \d -> do
       moveDroid (oppose d)
       pure True
 
+movePath :: [Dir] -> Droid ()
+movePath ds = foldr ((>>) . moveDroid) (pure ()) ds
+
 backtrack :: [Dir] -> Droid ()
-backtrack [] = pure ()
-backtrack (d:ds) = do
-  moveDroid (oppose d)
-  backtrack ds
+backtrack = movePath . map oppose
 
 data Tree = Tree Point Tile (Map Dir Tree) deriving (Show)
 
@@ -161,9 +163,28 @@ lengthToGoal (Tree _ _ m)
   | M.null m = 10000000
   | otherwise = (+1) . minimum . map (lengthToGoal . snd) . M.toList $ m
 
+pathToGoal :: Tree -> Maybe [Dir]
+pathToGoal (Tree _ Goal _) = Just []
+pathToGoal (Tree _ _ m)
+  | M.null m = Nothing
+  | otherwise = headMay . mapMaybe (\(d, t) -> (d :) <$> pathToGoal t) . M.toList $ m
+
+pathToPoint :: Point -> Tree -> Maybe [Dir]
+pathToPoint p (Tree p' _ _) | p == p' = Just []
+pathToPoint p (Tree _ _ m) = headMay . mapMaybe (\(d, t) -> (d :) <$> pathToPoint p t) . M.toList $ m
+
+allPoints :: Tree -> [Point]
+allPoints = nub . allPoints'
+  where allPoints' (Tree p _ m) = p : concatMap (allPoints . snd) (M.toList m)
+
+height :: Tree -> Int
+height = maximum . map length . allShortestPaths
+
+allShortestPaths :: Tree -> [[Dir]]
+allShortestPaths t = mapMaybe (`pathToPoint` t) . allPoints $ t
+
 dfs :: Tile -> Set Point -> Droid (Tree, Set Point)
 dfs tile s = do
-  liftIO . print =<< get
   possible <- availableNeighbors
   p <- use pos
   treesWithSets <- forM possible $ \d ->
@@ -171,7 +192,7 @@ dfs tile s = do
                   then pure ((d, Tree p tile M.empty), s)
                   else do tile' <- moveDroid d
                           (t, s') <- dfs tile' (S.insert p s)
-                          backtrack [d]
+                          moveDroid (oppose d)
                           pure ((d, t), s')
   let s' = foldr (S.union . snd) S.empty treesWithSets
   pure (Tree p tile (M.fromList (map fst treesWithSets)), s')
@@ -182,4 +203,10 @@ main = do
   hSetEcho stdin False
   cs <- fromFile "../15.txt"
   ((t, _), _) <- runDroid (dfs Floor S.empty) cs
-  print (lengthToGoal t)
+  let Just p = pathToGoal t
+      part1 = length p
+  print part1
+
+  ((t', _), ds) <- runDroid (movePath p >> dfs Goal S.empty) cs
+  let part2 = height t'
+  print (height t')
