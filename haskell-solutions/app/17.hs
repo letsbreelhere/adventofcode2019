@@ -3,6 +3,8 @@ module Main where
 import Control.Arrow
 import Control.Lens
 import Control.Monad
+import Control.Monad.ST
+import Data.STRef
 import Data.Foldable
 import Data.List
 import Data.Map (Map)
@@ -10,8 +12,8 @@ import qualified Data.Map as M
 import Intcode
 import Linear.V2
 import Safe
-
-type Point = V2 Int
+import Dir
+import Debug.Trace
 
 data Tile
   = Pipe
@@ -50,7 +52,7 @@ parseLayout y m p (row:rows) = parseLayout (y + 1) m' p' rows
     (m', p') =
       foldr
         (\(entryPoint, entry, isBot) (curM, curP) ->
-           ( M.insert p entry curM
+           ( M.insert entryPoint entry curM
            , if isBot
                then entryPoint
                else curP))
@@ -65,6 +67,31 @@ parseLayout y m p (row:rows) = parseLayout (y + 1) m' p' rows
               'X' -> Space
               _ -> Pipe
       in (V2 x y, tile, c `elem` botChars)
+
+isPipe l p = M.lookup p l == Just Pipe
+
+data Move = DeadEnd | Ahead | Turning Turn
+  deriving (Show)
+
+nextMove :: Layout -> Point -> Dir -> Move
+nextMove l p d
+  | isPipe l (moveDir p d) = Ahead
+  | otherwise =
+    let mturn = find (isPipe l . moveDir p . (`turnDir` d)) [L, R]
+     in maybe DeadEnd Turning mturn
+
+route :: Layout -> Point -> [(Turn, Int)]
+route l p = tail $ route' p N [] 0 R
+  where
+    route' pos dir result count lastTurn =
+      case nextMove l pos dir of
+        DeadEnd -> result
+        Ahead -> route' (moveDir pos dir) dir result (count + 1) lastTurn
+        Turning t ->
+          let dir' = turnDir t dir
+              pos' = moveDir pos dir'
+              result' = result ++ [(lastTurn, count)]
+           in route' pos' dir' result' 0 t
 
 subseqs :: [a] -> [[a]]
 subseqs [x] = [[x]]
@@ -89,7 +116,6 @@ main = do
       (layout, pos) = parseLayout 0 M.empty (V2 (-1) (-1)) (lines str)
       part1 = sum . map (\(V2 x y) -> x * y) $ intersectionPoints layout
   print part1
-  print pos
-  putStrLn str
+  print $ route layout pos
   let awakeCs = cs & code %~ M.insert 0 2
   pure ()
