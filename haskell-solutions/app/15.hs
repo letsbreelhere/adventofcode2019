@@ -1,20 +1,24 @@
 module Main where
 
+import Control.Lens
+import Control.Monad.IO.Class
+import Control.Monad.State
 import Data.List
-import Intcode
-import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as M
-import Linear.V2
-import Control.Monad.State
-import Control.Monad.IO.Class
-import Control.Lens
-import System.IO
+import Data.Maybe
 import Data.Set (Set)
 import qualified Data.Set as S
+import Intcode
+import Linear.V2
 import Safe
+import System.IO
 
-data Dir = N | S | W | E
+data Dir
+  = N
+  | S
+  | W
+  | E
   deriving (Show, Eq, Ord)
 
 oppose :: Dir -> Dir
@@ -25,10 +29,14 @@ oppose W = E
 
 getKey :: IO String
 getKey = reverse <$> getKey' ""
-  where getKey' chars = do
-          char <- getChar
-          more <- hReady stdin
-          (if more then getKey' else return) (char:chars)
+  where
+    getKey' chars = do
+      char <- getChar
+      more <- hReady stdin
+      (if more
+         then getKey'
+         else return)
+        (char : chars)
 
 getDir :: IO Dir
 getDir = do
@@ -38,7 +46,7 @@ getDir = do
     "\ESC[B" -> pure S
     "\ESC[C" -> pure E
     "\ESC[D" -> pure W
-    _        -> fail $ "Unexpected input " ++ show k
+    _ -> fail $ "Unexpected input " ++ show k
 
 instance Enum Dir where
   fromEnum N = 1
@@ -50,7 +58,10 @@ instance Enum Dir where
   toEnum 3 = W
   toEnum 4 = E
 
-data Tile = Wall | Floor | Goal
+data Tile
+  = Wall
+  | Floor
+  | Goal
   deriving (Show, Eq, Enum)
 
 data Turn
@@ -83,6 +94,7 @@ data DroidState = DroidState
   , _layout :: Layout
   , _computer :: ComputerState
   }
+
 makeLenses ''DroidState
 
 type Droid a = StateT DroidState IO a
@@ -92,7 +104,8 @@ defaultState = DroidState 0 (M.fromList [(0, Floor)])
 
 moveDroid :: Dir -> Droid Tile
 moveDroid dir = do
-  (o, computer') <- liftIO . runUntilOutput [fromIntegral $ fromEnum dir] =<< use computer
+  (o, computer') <-
+    liftIO . runUntilOutput [fromIntegral $ fromEnum dir] =<< use computer
   let t = toEnum . fromIntegral . fromJust $ o
   computer .= computer'
   pos' <- move dir <$> use pos
@@ -121,33 +134,35 @@ showLayout ds =
       row ry = do
         rx <- [x1 .. x2]
         if V2 rx ry == (ds ^. pos)
-           then "@"
-           else case M.lookup (V2 rx ry) h of
-                  Just Wall -> "█"
-                  Just Goal -> "!"
-                  Just Floor -> " "
-                  Nothing -> "▒"
-  in unlines $ map row [y2,y2-1..y1]
+          then "@"
+          else case M.lookup (V2 rx ry) h of
+                 Just Wall -> "█"
+                 Just Goal -> "!"
+                 Just Floor -> " "
+                 Nothing -> "▒"
+  in unlines $ map row [y2,y2 - 1 .. y1]
 
 instance Show DroidState where
   show = showLayout
 
 repl :: Droid ()
-repl = forever $ do
-  availableNeighbors
-  ds <- get
-  liftIO . putStrLn . showLayout $ ds
-  dir <- liftIO getDir
-  moveDroid dir
+repl =
+  forever $ do
+    availableNeighbors
+    ds <- get
+    liftIO . putStrLn . showLayout $ ds
+    dir <- liftIO getDir
+    moveDroid dir
 
 availableNeighbors :: Droid [Dir]
-availableNeighbors = flip filterM [N, S, E, W] $ \d -> do
-  t <- moveDroid d
-  case t of
-    Wall -> pure False
-    _ -> do
-      moveDroid (oppose d)
-      pure True
+availableNeighbors =
+  flip filterM [N, S, E, W] $ \d -> do
+    t <- moveDroid d
+    case t of
+      Wall -> pure False
+      _ -> do
+        moveDroid (oppose d)
+        pure True
 
 movePath :: [Dir] -> Droid ()
 movePath ds = foldr ((>>) . moveDroid) (pure ()) ds
@@ -155,27 +170,35 @@ movePath ds = foldr ((>>) . moveDroid) (pure ()) ds
 backtrack :: [Dir] -> Droid ()
 backtrack = movePath . map oppose
 
-data Tree = Tree Point Tile (Map Dir Tree) deriving (Show)
+data Tree =
+  Tree Point
+       Tile
+       (Map Dir Tree)
+  deriving (Show)
 
 lengthToGoal :: Tree -> Int
 lengthToGoal (Tree _ Goal _) = 0
 lengthToGoal (Tree _ _ m)
   | M.null m = 10000000
-  | otherwise = (+1) . minimum . map (lengthToGoal . snd) . M.toList $ m
+  | otherwise = (+ 1) . minimum . map (lengthToGoal . snd) . M.toList $ m
 
 pathToGoal :: Tree -> Maybe [Dir]
 pathToGoal (Tree _ Goal _) = Just []
 pathToGoal (Tree _ _ m)
   | M.null m = Nothing
-  | otherwise = headMay . mapMaybe (\(d, t) -> (d :) <$> pathToGoal t) . M.toList $ m
+  | otherwise =
+    headMay . mapMaybe (\(d, t) -> (d :) <$> pathToGoal t) . M.toList $ m
 
 pathToPoint :: Point -> Tree -> Maybe [Dir]
-pathToPoint p (Tree p' _ _) | p == p' = Just []
-pathToPoint p (Tree _ _ m) = headMay . mapMaybe (\(d, t) -> (d :) <$> pathToPoint p t) . M.toList $ m
+pathToPoint p (Tree p' _ _)
+  | p == p' = Just []
+pathToPoint p (Tree _ _ m) =
+  headMay . mapMaybe (\(d, t) -> (d :) <$> pathToPoint p t) . M.toList $ m
 
 allPoints :: Tree -> [Point]
 allPoints = nub . allPoints'
-  where allPoints' (Tree p _ m) = p : concatMap (allPoints . snd) (M.toList m)
+  where
+    allPoints' (Tree p _ m) = p : concatMap (allPoints . snd) (M.toList m)
 
 height :: Tree -> Int
 height = maximum . map length . allShortestPaths
@@ -187,13 +210,15 @@ dfs :: Tile -> Set Point -> Droid (Tree, Set Point)
 dfs tile s = do
   possible <- availableNeighbors
   p <- use pos
-  treesWithSets <- forM possible $ \d ->
-               if S.member p s
-                  then pure ((d, Tree p tile M.empty), s)
-                  else do tile' <- moveDroid d
-                          (t, s') <- dfs tile' (S.insert p s)
-                          moveDroid (oppose d)
-                          pure ((d, t), s')
+  treesWithSets <-
+    forM possible $ \d ->
+      if S.member p s
+        then pure ((d, Tree p tile M.empty), s)
+        else do
+          tile' <- moveDroid d
+          (t, s') <- dfs tile' (S.insert p s)
+          moveDroid (oppose d)
+          pure ((d, t), s')
   let s' = foldr (S.union . snd) S.empty treesWithSets
   pure (Tree p tile (M.fromList (map fst treesWithSets)), s')
 
@@ -206,7 +231,6 @@ main = do
   let Just p = pathToGoal t
       part1 = length p
   print part1
-
   ((t', _), ds) <- runDroid (movePath p >> dfs Goal S.empty) cs
   let part2 = height t'
   print (height t')
