@@ -32,39 +32,43 @@ default-extensions:
 source-dirs: app
 
 executables:
-  5:
-    main:                5.hs
+  #5:
+    #main:                5.hs
+    #dependencies:
+    #- advent-solutions
+  #8:
+    #main:                8.hs
+    #dependencies:
+    #- advent-solutions
+  #9:
+    #main:                9.hs
+    #dependencies:
+    #- advent-solutions
+  #10:
+    #main:                10.hs
+    #dependencies:
+    #- advent-solutions
+  #11:
+    #main:                11.hs
+    #dependencies:
+    #- advent-solutions
+  #12:
+    #main:                12.hs
+    #dependencies:
+    #- advent-solutions
+  #13:
+    #main:                13.hs
+    #dependencies:
+    #- advent-solutions
+  #14:
+    #main:                14.hs
+    #dependencies:
+    #- advent-solutions
+  15:
+    main:                15.hs
     dependencies:
     - advent-solutions
-  8:
-    main:                8.hs
-    dependencies:
-    - advent-solutions
-  9:
-    main:                9.hs
-    dependencies:
-    - advent-solutions
-  10:
-    main:                10.hs
-    dependencies:
-    - advent-solutions
-  11:
-    main:                11.hs
-    dependencies:
-    - advent-solutions
-  12:
-    main:                12.hs
-    dependencies:
-    - advent-solutions
-  13:
-    main:                13.hs
-    dependencies:
-    - advent-solutions
-  14:
-    main:                14.hs
-    dependencies:
-    - advent-solutions
-  16:
-    main:                16.hs
-    dependencies:
-    - advent-solutions
+  #16:
+    #main:                16.hs
+    #dependencies:
+    #- advent-solutions
