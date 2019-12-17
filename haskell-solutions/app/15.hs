@@ -175,19 +175,20 @@ allShortestPaths t = mapMaybe (`pathToPoint` t) . allPoints $ t
 
 dfs :: Tile -> Set Point -> Droid (Tree, Set Point)
 dfs tile s = do
-  possible <- availableNeighbors
   p <- use pos
   treesWithSets <-
-    forM possible $ \d ->
+    forM [N, S, E, W] $ \dir ->
       if S.member p s
-        then pure ((d, Tree p tile M.empty), s)
-        else do
-          tile' <- moveDroid d
-          (t, s') <- dfs tile' (S.insert p s)
-          moveDroid (oppose d)
-          pure ((d, t), s')
-  let s' = foldr (S.union . snd) S.empty treesWithSets
-  pure (Tree p tile (M.fromList (map fst treesWithSets)), s')
+        then pure (dir, Tree p tile M.empty, s)
+        else moveDroid dir >>= \case
+               Wall -> pure (dir, Tree p Wall M.empty, s)
+               tile' -> do
+                 (t, s') <- dfs tile' (S.insert p s)
+                 moveDroid (oppose dir)
+                 pure (dir, t, s')
+  let s' = foldr (\(_, _, s) acc -> S.union acc s) S.empty treesWithSets
+      children = M.fromList $ map (\(d, t, _) -> (d, t)) treesWithSets
+  pure (Tree p tile children, s')
 
 main :: IO ()
 main = do
