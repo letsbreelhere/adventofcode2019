@@ -27,27 +27,6 @@ oppose S = N
 oppose E = W
 oppose W = E
 
-getKey :: IO String
-getKey = reverse <$> getKey' ""
-  where
-    getKey' chars = do
-      char <- getChar
-      more <- hReady stdin
-      (if more
-         then getKey'
-         else return)
-        (char : chars)
-
-getDir :: IO Dir
-getDir = do
-  k <- getKey
-  case k of
-    "\ESC[A" -> pure N
-    "\ESC[B" -> pure S
-    "\ESC[C" -> pure E
-    "\ESC[D" -> pure W
-    _ -> fail $ "Unexpected input " ++ show k
-
 instance Enum Dir where
   fromEnum N = 1
   fromEnum S = 2
@@ -145,15 +124,6 @@ showLayout ds =
 instance Show DroidState where
   show = showLayout
 
-repl :: Droid ()
-repl =
-  forever $ do
-    availableNeighbors
-    ds <- get
-    liftIO . putStrLn . showLayout $ ds
-    dir <- liftIO getDir
-    moveDroid dir
-
 availableNeighbors :: Droid [Dir]
 availableNeighbors =
   flip filterM [N, S, E, W] $ \d -> do
@@ -165,7 +135,7 @@ availableNeighbors =
         pure True
 
 movePath :: [Dir] -> Droid ()
-movePath ds = foldr ((>>) . moveDroid) (pure ()) ds
+movePath = foldr ((>>) . moveDroid) (pure ())
 
 backtrack :: [Dir] -> Droid ()
 backtrack = movePath . map oppose
@@ -177,10 +147,7 @@ data Tree =
   deriving (Show)
 
 lengthToGoal :: Tree -> Int
-lengthToGoal (Tree _ Goal _) = 0
-lengthToGoal (Tree _ _ m)
-  | M.null m = 10000000
-  | otherwise = (+ 1) . minimum . map (lengthToGoal . snd) . M.toList $ m
+lengthToGoal = length . fromJust . pathToGoal
 
 pathToGoal :: Tree -> Maybe [Dir]
 pathToGoal (Tree _ Goal _) = Just []
@@ -224,13 +191,12 @@ dfs tile s = do
 
 main :: IO ()
 main = do
-  hSetBuffering stdin NoBuffering
-  hSetEcho stdin False
   cs <- fromFile "../15.txt"
-  ((t, _), _) <- runDroid (dfs Floor S.empty) cs
+  ((t, _), ds) <- runDroid (dfs Floor S.empty) cs
   let Just p = pathToGoal t
       part1 = length p
+  print ds
   print part1
-  ((t', _), ds) <- runDroid (movePath p >> dfs Goal S.empty) cs
+  ((t', _), _) <- runDroid (movePath p >> dfs Goal S.empty) cs
   let part2 = height t'
   print (height t')
