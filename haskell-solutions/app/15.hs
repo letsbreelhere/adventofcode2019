@@ -153,25 +153,33 @@ backtrack (d:ds) = do
   moveDroid (oppose d)
   backtrack ds
 
-dfs :: Set Point -> Droid (Set Point)
-dfs s = do
+data Tree = Tree Point Tile (Map Dir Tree) deriving (Show)
+
+lengthToGoal :: Tree -> Int
+lengthToGoal (Tree _ Goal _) = 0
+lengthToGoal (Tree _ _ m)
+  | M.null m = 10000000
+  | otherwise = (+1) . minimum . map (lengthToGoal . snd) . M.toList $ m
+
+dfs :: Tile -> Set Point -> Droid (Tree, Set Point)
+dfs tile s = do
   liftIO . print =<< get
   possible <- availableNeighbors
   p <- use pos
-  ss <- forM possible $ \d ->
+  treesWithSets <- forM possible $ \d ->
                if S.member p s
-                  then pure s
-                  else do moveDroid d
-                          s' <- dfs (S.insert p s)
+                  then pure ((d, Tree p tile M.empty), s)
+                  else do tile' <- moveDroid d
+                          (t, s') <- dfs tile' (S.insert p s)
                           backtrack [d]
-                          pure s'
-  let s' = foldr S.union S.empty ss
-  pure s'
+                          pure ((d, t), s')
+  let s' = foldr (S.union . snd) S.empty treesWithSets
+  pure (Tree p tile (M.fromList (map fst treesWithSets)), s')
 
 main :: IO ()
 main = do
   hSetBuffering stdin NoBuffering
   hSetEcho stdin False
   cs <- fromFile "../15.txt"
-  runDroid (dfs S.empty) cs
-  pure ()
+  ((t, _), _) <- runDroid (dfs Floor S.empty) cs
+  print (lengthToGoal t)
