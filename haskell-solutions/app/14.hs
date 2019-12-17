@@ -59,9 +59,7 @@ makeLenses ''WalkState
 type Walk a = State WalkState a
 
 divRoundUp :: Int -> Int -> Int
-divRoundUp a b
-  | r == 0 = q
-  | otherwise = q + 1
+divRoundUp a b = q + signum r
   where
     (q, r) = a `divMod` b
 
@@ -86,10 +84,7 @@ needed t desiredCount = do
 
 difference :: (Ord a, Ord n, Num n) => Map a n -> Map a n -> Map a n
 difference =
-  merge
-    preserveMissing
-    dropMissing
-    (zipWithMatched $ \_ l r -> max (l - r) 0)
+  merge preserveMissing dropMissing (zipWithMatched $ \_ l r -> max (l - r) 0)
 
 removeExistingFrom :: Map Text Int -> Walk (Map Text Int)
 removeExistingFrom m = do

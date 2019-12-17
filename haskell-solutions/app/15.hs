@@ -175,6 +175,7 @@ allShortestPaths t = mapMaybe (`pathToPoint` t) . allPoints $ t
 
 dfs :: Tile -> Set Point -> Droid (Tree, Set Point)
 dfs tile s = do
+  liftIO . print =<< get
   p <- use pos
   treesWithSets <-
     forM [N, S, E, W] $ \dir ->
@@ -196,7 +197,6 @@ main = do
   ((t, _), ds) <- runDroid (dfs Floor S.empty) cs
   let Just p = pathToGoal t
       part1 = length p
-  print ds
   print part1
   ((t', _), _) <- runDroid (movePath p >> dfs Goal S.empty) cs
   let part2 = height t'

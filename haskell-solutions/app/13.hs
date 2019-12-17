@@ -76,11 +76,11 @@ findHighScore cs = do
       nextIn = followBall board
       score = lastMay . getScores . toList . view outputs $ cs
   -- If you want it pretty and slow af:
-  --clearScreen
-  --putStr "Score: "
-  --print (fromMaybe 0 score)
-  --putStrLn (render board)
-  --threadDelay 50000
+  clearScreen
+  putStr "Score: "
+  print (fromMaybe 0 score)
+  putStrLn (render board)
+  threadDelay 50000
   if cs ^. status == Halted
     then pure score
     else findHighScore =<< runWithInput [nextIn] cs
