@@ -9,9 +9,17 @@ import Control.Monad.State
 import Control.Monad.IO.Class
 import Control.Lens
 import System.IO
+import Data.Set (Set)
+import qualified Data.Set as S
 
 data Dir = N | S | W | E
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
+
+oppose :: Dir -> Dir
+oppose N = S
+oppose S = N
+oppose E = W
+oppose W = E
 
 getKey :: IO String
 getKey = reverse <$> getKey' ""
@@ -80,20 +88,17 @@ type Droid a = StateT DroidState IO a
 defaultState :: ComputerState -> DroidState
 defaultState = DroidState 0 (M.fromList [(0, Floor)])
 
-moveDroid :: Dir -> Droid (Maybe Tile)
+moveDroid :: Dir -> Droid Tile
 moveDroid dir = do
   (o, computer') <- liftIO . runUntilOutput [fromIntegral $ fromEnum dir] =<< use computer
-  let mt = toEnum . fromIntegral <$> o
+  let t = toEnum . fromIntegral . fromJust $ o
   computer .= computer'
   pos' <- move dir <$> use pos
-  case mt of
-    Just Wall -> pure ()
-    Nothing -> pure ()
+  case t of
+    Wall -> pure ()
     _ -> pos .= pos'
-  case mt of
-    Nothing -> pure ()
-    Just t -> layout %= M.insert pos' t
-  pure mt
+  layout %= M.insert pos' t
+  pure t
 
 runDroid :: Droid a -> ComputerState -> IO (a, DroidState)
 runDroid p = runStateT p . defaultState
@@ -118,21 +123,55 @@ showLayout ds =
            else case M.lookup (V2 rx ry) h of
                   Just Wall -> "█"
                   Just Goal -> "!"
-                  Just Floor -> "."
-                  Nothing -> " "
+                  Just Floor -> " "
+                  Nothing -> "▒"
   in unlines $ map row [y2,y2-1..y1]
+
+instance Show DroidState where
+  show = showLayout
 
 repl :: Droid ()
 repl = forever $ do
-  dir <- liftIO getDir
-  moveDroid dir
+  availableNeighbors
   ds <- get
   liftIO . putStrLn . showLayout $ ds
+  dir <- liftIO getDir
+  moveDroid dir
+
+availableNeighbors :: Droid [Dir]
+availableNeighbors = flip filterM [N, S, E, W] $ \d -> do
+  t <- moveDroid d
+  case t of
+    Wall -> pure False
+    _ -> do
+      moveDroid (oppose d)
+      pure True
+
+backtrack :: [Dir] -> Droid ()
+backtrack [] = pure ()
+backtrack (d:ds) = do
+  moveDroid (oppose d)
+  backtrack ds
+
+dfs :: Set Point -> Droid (Set Point)
+dfs s = do
+  liftIO . print =<< get
+  possible <- availableNeighbors
+  p <- use pos
+  ss <- forM possible $ \d ->
+               if S.member p s
+                  then pure s
+                  else do moveDroid d
+                          s' <- dfs (S.insert p s)
+                          backtrack [d]
+                          pure s'
+  let s' = foldr S.union S.empty ss
+  pure s'
 
 main :: IO ()
 main = do
   hSetBuffering stdin NoBuffering
   hSetEcho stdin False
   cs <- fromFile "../15.txt"
-  runDroid repl  cs
+  runDroid (dfs S.empty) cs
   pure ()
