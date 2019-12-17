@@ -64,7 +64,6 @@ parseLayout y m p (row:rows) = parseLayout (y + 1) m' p' rows
       let tile =
             case c of
               '.' -> Space
-              'X' -> Space
               _ -> Pipe
       in (V2 x y, tile, c `elem` botChars)
 
@@ -116,6 +115,8 @@ main = do
       (layout, pos) = parseLayout 0 M.empty (V2 (-1) (-1)) (lines str)
       part1 = sum . map (\(V2 x y) -> x * y) $ intersectionPoints layout
   print part1
-  print $ route layout pos
+
   let awakeCs = cs & code %~ M.insert 0 2
-  pure ()
+      routed = route layout pos
+      s = intercalate "," $ map (\(t, c) -> show t ++ "," ++ show c) routed
+  putStrLn s

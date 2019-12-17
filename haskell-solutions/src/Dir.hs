@@ -14,7 +14,7 @@ data Dir
 data Turn
   = L
   | R
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 oppose :: Dir -> Dir
 oppose N = S
