@@ -35,23 +35,19 @@ turnDir R S = W
 turnBetween :: Dir -> Dir -> Maybe Turn
 turnBetween N E = Just R
 turnBetween E N = Just L
-
 turnBetween E S = Just R
 turnBetween S E = Just L
-
 turnBetween S W = Just R
 turnBetween W S = Just L
-
 turnBetween W N = Just R
 turnBetween N W = Just L
-
 turnBetween _ _ = Nothing
 
 turns :: Dir -> [Dir] -> [Maybe Turn]
 turns _ [] = []
 turns start (d:ds) =
   let d' = turnBetween start d
-   in d' : turns d ds
+  in d' : turns d ds
 
 vectorRep :: Dir -> Point
 vectorRep N = V2 0 1
