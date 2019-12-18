@@ -9,23 +9,11 @@ import qualified Data.Map as M
 import Data.Maybe
 import Data.Set (Set)
 import qualified Data.Set as S
+import Dir
 import Intcode
 import Linear.V2
 import Safe
 import System.IO
-
-data Dir
-  = N
-  | S
-  | W
-  | E
-  deriving (Show, Eq, Ord)
-
-oppose :: Dir -> Dir
-oppose N = S
-oppose S = N
-oppose E = W
-oppose W = E
 
 instance Enum Dir where
   fromEnum N = 1
@@ -43,30 +31,7 @@ data Tile
   | Goal
   deriving (Show, Eq, Enum)
 
-data Turn
-  = L
-  | R
-  deriving (Show, Eq)
-
-type Point = V2 Int
-
 type Layout = Map Point Tile
-
-turnDir :: Turn -> Dir -> Dir
-turnDir L N = W
-turnDir L E = N
-turnDir L W = S
-turnDir L S = E
-turnDir R N = E
-turnDir R E = S
-turnDir R W = N
-turnDir R S = W
-
-move :: Dir -> Point -> Point
-move N (V2 x y) = V2 x (y + 1)
-move E (V2 x y) = V2 (x + 1) y
-move W (V2 x y) = V2 (x - 1) y
-move S (V2 x y) = V2 x (y - 1)
 
 data DroidState = DroidState
   { _pos :: Point
@@ -87,7 +52,7 @@ moveDroid dir = do
     liftIO . runUntilOutput [fromIntegral $ fromEnum dir] =<< use computer
   let t = toEnum . fromIntegral . fromJust $ o
   computer .= computer'
-  pos' <- move dir <$> use pos
+  pos' <- fmap (`moveDir` dir) (use pos)
   case t of
     Wall -> pure ()
     _ -> pos .= pos'
@@ -175,7 +140,6 @@ allShortestPaths t = mapMaybe (`pathToPoint` t) . allPoints $ t
 
 dfs :: Tile -> Set Point -> Droid (Tree, Set Point)
 dfs tile s = do
-  liftIO . print =<< get
   p <- use pos
   treesWithSets <-
     forM [N, S, E, W] $ \dir ->
@@ -194,7 +158,7 @@ dfs tile s = do
 main :: IO ()
 main = do
   cs <- fromFile "../15.txt"
-  ((t, _), ds) <- runDroid (dfs Floor S.empty) cs
+  ((t, _), _) <- runDroid (dfs Floor S.empty) cs
   let Just p = pathToGoal t
       part1 = length p
   print part1
