@@ -119,4 +119,5 @@ main = do
   let awakeCs = cs & code %~ M.insert 0 2
       routed = route layout pos
       s = intercalate "," $ map (\(t, c) -> show t ++ "," ++ show c) routed
+      sorted = sortedSubseqs routed
   putStrLn s

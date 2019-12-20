@@ -10,16 +10,17 @@ description: "AoC 2019 solutions"
 
 dependencies:
 - base >= 4.7 && < 5
-- attoparsec
-- lens
-- mtl
-- vector
-- containers
-- text
-- split
-- safe
-- linear
 - ansi-terminal
+- attoparsec
+- containers
+- lens
+- linear
+- mtl
+- ordered-containers
+- safe
+- split
+- text
+- vector
 
 library:
   source-dirs: src
