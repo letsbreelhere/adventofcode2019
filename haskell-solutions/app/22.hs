@@ -15,10 +15,39 @@ data Move = DealIntoNew
           | DealWith Integer
           deriving (Show)
 
+
+-------------
+-- PARSING --
+-------------
+
+parseMoves :: Text -> Either String [Move]
+parseMoves = parseOnly parseMoves'
+
+parseMoves' :: Parser [Move]
+parseMoves' = parseMove `sepBy1` char '\n'
+
+parseMove :: Parser Move
+parseMove =
+  parseDealNew <|> parseCut <|> parseDealWith
+
+parseDealNew = string "deal into new stack" *> pure DealIntoNew
+parseCut = do
+  string "cut "
+  n <- signed decimal
+  pure (Cut n)
+parseDealWith = do
+  string "deal with increment "
+  n <- signed decimal
+  pure (DealWith n)
+
+---------------
+-- SHUFFLING --
+---------------
+
 performNonModAtIndex :: Move -> Integer -> Integer -> Integer
 performNonModAtIndex move ix deckSize =
   case move of
-    DealIntoNew -> deckSize - ix - 1
+    DealIntoNew -> -(ix + 1)
     Cut k -> ix - k
     DealWith k -> ix * k
 
@@ -56,32 +85,12 @@ invert _ DealIntoNew = DealIntoNew
 invert _ (Cut k) = Cut (-k)
 invert n (DealWith k) = DealWith (modInv k n)
 
-parseMoves :: Text -> Either String [Move]
-parseMoves = parseOnly parseMoves'
-
-parseMoves' :: Parser [Move]
-parseMoves' = parseMove `sepBy1` char '\n'
-
-parseMove :: Parser Move
-parseMove =
-  parseDealNew <|> parseCut <|> parseDealWith
-
-parseDealNew = string "deal into new stack" *> pure DealIntoNew
-parseCut = do
-  string "cut "
-  n <- signed decimal
-  pure (Cut n)
-parseDealWith = do
-  string "deal with increment "
-  n <- signed decimal
-  pure (DealWith n)
-
 coefficients :: [Move] -> Integer -> (Integer, Integer)
 coefficients moves deckSize =
   let addend = performAllAtIndex moves 0 deckSize
       atOne = performAllAtIndex moves 1 deckSize
       factor = atOne - addend
-   in (factor, addend)
+   in (factor `mod` deckSize, addend `mod` deckSize)
 
 -- Thanks again, Rosetta.
 modExp' :: Integer -> Integer -> Integer -> Integer -> Integer
@@ -91,6 +100,7 @@ modExp' b e m r
 modExp' b e m r = modExp' (b * b `mod` m) (e `div` 2) m r
 
 modExp :: Integer -> Integer -> Integer -> Integer
+modExp b e m | e < 0 = modInv (modExp b (-e) m) m
 modExp b e m = modExp' b e m 1
 
 -- Given a, b, x0, m, and n, compute the nth iteration of x_(k+1) = (a*x_k + b) mod m.
@@ -98,25 +108,32 @@ modExp b e m = modExp' b e m 1
 -- a^n*x_0 + sum(a^k, k <- 0..n-1) * b.
 -- == a^n*x_0 + b * ((a^n - 1) / (a - 1))
 --         a       -> b       -> x0      -> n       -> m       -> result
-nthIter :: Integer -> Integer -> Integer -> Integer -> Integer -> Integer
-nthIter a b x0 n m =
-  let a' = a `mod` m
-      b' = b `mod` m
+nthCoeff a b n m =
+  let e = modExp a n m
+      rsum = if a == 1 then n + 1 else (e-1) * modInv (a-1) m
+   in (e, (b * rsum) `mod` m)
 
-      e = modExp a' n m
-      lhs = e * x0
-      rhs = b' * ((e-1) `div` (a'-1))
-   in (lhs + rhs) `mod` m
+shuffle :: Integer -> Deck -> [Move] -> Deck
+shuffle iterations deck moves =
+  let len = fromIntegral (length deck)
+      (factor, addend) = coefficients moves len
+      (a, b) = nthCoeff factor addend iterations len
+   in traceShow (factor, addend, a, b) $ map (\ix -> ((ix - b) * modInv a len)`mod`len) deck
+
+invertMoves :: Integer -> [Move] -> [Move]
+invertMoves len = map (invert len) . reverse
 
 main :: IO ()
 main = do
   Right moves <- parseMoves <$> T.readFile "../22.txt"
   let smallDeckSize = 10007
       (factor, addend) = coefficients moves smallDeckSize
-  let part1 = (factor*2019 + addend) `mod` smallDeckSize
+      part1 = (factor*2019 + addend) `mod` smallDeckSize
   print part1
 
   let hugeDeckSize = 119315717514047
       iterations = 101741582076661
-      (factor', addend') = coefficients (map (invert hugeDeckSize) . reverse $ moves) hugeDeckSize
-  print $ nthIter factor' addend' 2020 iterations hugeDeckSize
+      (factor', addend') = coefficients moves hugeDeckSize
+      (a, b) = nthCoeff factor' addend' iterations hugeDeckSize
+      part2 = (2020 - b) * modInv a hugeDeckSize
+  print $ part2 `mod` hugeDeckSize
