@@ -15,10 +15,6 @@ data Move = DealIntoNew
           | DealWith Integer
           deriving (Show)
 
---------------------
--- INDEX-TRACKING --
---------------------
-
 performNonModAtIndex :: Move -> Integer -> Integer -> Integer
 performNonModAtIndex move ix deckSize =
   case move of
@@ -95,31 +91,32 @@ modExp' b e m r
 modExp' b e m r = modExp' (b * b `mod` m) (e `div` 2) m r
 
 modExp :: Integer -> Integer -> Integer -> Integer
-modExp b e m
-  | traceShow (b, e, m) False = error "Uh oh"
 modExp b e m = modExp' b e m 1
 
 -- Given a, b, x0, m, and n, compute the nth iteration of x_(k+1) = (a*x_k + b) mod m.
---         a   -> b   -> x0  -> n   -> m   -> result
--- Quick mafs. This is equal (mod m) to:
+-- This is equal (mod m) to:
 -- a^n*x_0 + sum(a^k, k <- 0..n-1) * b.
 -- == a^n*x_0 + b * ((a^n - 1) / (a - 1))
+--         a       -> b       -> x0      -> n       -> m       -> result
 nthIter :: Integer -> Integer -> Integer -> Integer -> Integer -> Integer
 nthIter a b x0 n m =
-  let e = modExp a n m
-      lhs = x0 * e
-      rhs = b * ((e-1) `div` (a-1))
+  let a' = a `mod` m
+      b' = b `mod` m
+
+      e = modExp a' n m
+      lhs = e * x0
+      rhs = b' * ((e-1) `div` (a'-1))
    in (lhs + rhs) `mod` m
 
 main :: IO ()
 main = do
   Right moves <- parseMoves <$> T.readFile "../22.txt"
-  let (factor, addend) = coefficients moves 10007
-  putStrLn $ show (factor`mod`10007) ++ "k + " ++ show (addend`mod`10007)
-  let part1 = (factor*2019 + addend) `mod` 10007
+  let smallDeckSize = 10007
+      (factor, addend) = coefficients moves smallDeckSize
+  let part1 = (factor*2019 + addend) `mod` smallDeckSize
   print part1
+
   let hugeDeckSize = 119315717514047
       iterations = 101741582076661
       (factor', addend') = coefficients (map (invert hugeDeckSize) . reverse $ moves) hugeDeckSize
-  putStrLn $ show (factor'`mod`hugeDeckSize) ++ "k + " ++ show (addend'`mod`hugeDeckSize)
   print $ nthIter factor' addend' 2020 iterations hugeDeckSize
