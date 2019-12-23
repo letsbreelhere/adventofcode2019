@@ -1,20 +1,28 @@
 module Main where
 
 import Data.Text (Text)
-import Debug.Trace
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Data.List (sortOn, foldl', elemIndex)
 import Data.Attoparsec.Text (Parser, string, signed, decimal, parseOnly, sepBy1, char)
-import Control.Applicative
-
-type Deck = [Integer]
+import Control.Applicative ((<|>))
 
 data Move = DealIntoNew
           | Cut Integer
           | DealWith Integer
           deriving (Show)
 
+performAtIndex :: Move -> Integer -> Integer -> Integer
+performAtIndex move ix m =
+  let res = case move of
+              DealIntoNew -> -(ix + 1)
+              Cut k -> ix - k
+              DealWith k -> ix * k
+   in res `mod` m
+
+performAllAtIndex :: [Move] -> Integer -> Integer -> Integer
+performAllAtIndex moves initialIx deckSize =
+  foldl' (\ix move -> performAtIndex move ix deckSize) initialIx moves
 
 -------------
 -- PARSING --
@@ -40,23 +48,30 @@ parseDealWith = do
   n <- signed decimal
   pure (DealWith n)
 
+-----------------------------------------
+-- TEST FUNCTIONS (unused in solution) --
+-----------------------------------------
+
+type Deck = [Integer]
+
+shuffle :: Integer -> Deck -> [Move] -> Deck
+shuffle iterations deck moves =
+  let len = fromIntegral (length deck)
+      (scale, shift) = coefficients moves len
+      (a, b) = nthCoeff scale shift iterations len
+   in map (\ix -> ((ix - b) * modInv a len)`mod`len) deck
+
+invertMoves :: Integer -> [Move] -> [Move]
+invertMoves len = map (invert len) . reverse
+
+invert :: Integer -> Move -> Move
+invert _ DealIntoNew = DealIntoNew
+invert _ (Cut k) = Cut (-k)
+invert n (DealWith k) = DealWith (modInv k n)
+
 ---------------
 -- SHUFFLING --
 ---------------
-
-performNonModAtIndex :: Move -> Integer -> Integer -> Integer
-performNonModAtIndex move ix deckSize =
-  case move of
-    DealIntoNew -> -(ix + 1)
-    Cut k -> ix - k
-    DealWith k -> ix * k
-
-performAtIndex :: Move -> Integer -> Integer -> Integer
-performAtIndex move ix deckSize = performNonModAtIndex move ix deckSize `mod` deckSize
-
-performAllAtIndex :: [Move] -> Integer -> Integer -> Integer
-performAllAtIndex moves initialIx deckSize =
-  foldl' (\ix move -> performAtIndex move ix deckSize) initialIx moves
 
 -- Thanks, Rosetta Code.
 -- Modular multiplicative inverse (assuming modulus is prime, since it is in
@@ -80,17 +95,12 @@ gcdExt a b =
       (s, t, g) = gcdExt b r
   in (t, s - q * t, g)
 
-invert :: Integer -> Move -> Move
-invert _ DealIntoNew = DealIntoNew
-invert _ (Cut k) = Cut (-k)
-invert n (DealWith k) = DealWith (modInv k n)
-
 coefficients :: [Move] -> Integer -> (Integer, Integer)
 coefficients moves deckSize =
-  let addend = performAllAtIndex moves 0 deckSize
+  let shift = performAllAtIndex moves 0 deckSize
       atOne = performAllAtIndex moves 1 deckSize
-      factor = atOne - addend
-   in (factor `mod` deckSize, addend `mod` deckSize)
+      scale = atOne - shift
+   in (scale `mod` deckSize, shift `mod` deckSize)
 
 -- Thanks again, Rosetta.
 modExp' :: Integer -> Integer -> Integer -> Integer -> Integer
@@ -113,27 +123,17 @@ nthCoeff a b n m =
       rsum = if a == 1 then n + 1 else (e-1) * modInv (a-1) m
    in (e, (b * rsum) `mod` m)
 
-shuffle :: Integer -> Deck -> [Move] -> Deck
-shuffle iterations deck moves =
-  let len = fromIntegral (length deck)
-      (factor, addend) = coefficients moves len
-      (a, b) = nthCoeff factor addend iterations len
-   in traceShow (factor, addend, a, b) $ map (\ix -> ((ix - b) * modInv a len)`mod`len) deck
-
-invertMoves :: Integer -> [Move] -> [Move]
-invertMoves len = map (invert len) . reverse
-
 main :: IO ()
 main = do
   Right moves <- parseMoves <$> T.readFile "../22.txt"
   let smallDeckSize = 10007
-      (factor, addend) = coefficients moves smallDeckSize
-      part1 = (factor*2019 + addend) `mod` smallDeckSize
+      (scale, shift) = coefficients moves smallDeckSize
+      part1 = (scale*2019 + shift) `mod` smallDeckSize
   print part1
 
   let hugeDeckSize = 119315717514047
       iterations = 101741582076661
-      (factor', addend') = coefficients moves hugeDeckSize
-      (a, b) = nthCoeff factor' addend' iterations hugeDeckSize
+      (scale', shift') = coefficients moves hugeDeckSize
+      (a, b) = nthCoeff scale' shift' iterations hugeDeckSize
       part2 = (2020 - b) * modInv a hugeDeckSize
   print $ part2 `mod` hugeDeckSize
