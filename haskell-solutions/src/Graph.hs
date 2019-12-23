@@ -1,6 +1,7 @@
 {-# LANGUAGE ViewPatterns, TupleSections #-}
 module Graph where
 
+import Data.Bifunctor
 import Debug.Trace
 import Data.Sequence (Seq, viewl, ViewL(..), (|>))
 import qualified Data.Sequence as Seq
@@ -15,7 +16,7 @@ import Dir
 data Graph e v = Graph { getAdj :: Map v (Map e v) }
   deriving (Show, Eq)
 
--- Not a functor instance, because it doesn't satisfy the laws.
+-- Can' be a functor because it induces a constraint on the type argument :(
 mapVertices :: (Ord v, Ord v') => (v -> v') -> Graph e v -> Graph e v'
 mapVertices f = Graph . M.mapKeys f . M.map (M.map f) . getAdj
 
@@ -30,6 +31,19 @@ emptyGraph = Graph M.empty
 data Tree e v =
   Tree v
        (Map e (Tree e v))
+
+instance Functor (Tree e) where
+  fmap f (Tree v m) = Tree (f v) (M.map (fmap f) m)
+
+-- I guess there isn't a name for "commutatively foldable". Oh well, close
+-- enough.
+instance Foldable (Tree e) where
+  foldMap f (Tree v cs) =
+    let folded = foldMap (foldMap f) cs
+     in f v <> folded
+
+withHeights :: Tree e v -> Tree e (v, Int)
+withHeights (Tree v cs) = Tree (v, 0) (M.map (fmap (second (+1)) . withHeights) cs)
 
 showTree :: (Show v, Show e) => Int -> Tree e v -> [String]
 showTree indent (Tree v cs) =
@@ -64,11 +78,10 @@ addEdgeUnlessVisited visited v e v' (Graph g)
 deleteVertex :: (Ord v, Ord e) => v -> Graph e v -> Graph e v
 deleteVertex v = filterVertices (/= v)
 
-
 filterVertices :: (Ord v, Ord e) => (v -> Bool) -> Graph e v -> Graph e v
 filterVertices p (Graph g) =
-  let g' = M.filterWithKey (\v _ -> not (p v)) g
-      removeChildren = M.filter (not . p)
+  let g' = M.filterWithKey (\v _ -> p v) g
+      removeChildren = M.filter p
    in Graph (M.map removeChildren g')
 
 dfs' :: (Ord v, Ord e) => [(Maybe (v, e), v)] -> Set v -> Graph e v -> Graph e v -> Graph e v
