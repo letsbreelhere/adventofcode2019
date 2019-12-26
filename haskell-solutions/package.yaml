@@ -81,7 +81,11 @@ executables:
     #main:                18.hs
     #dependencies:
     #- advent-solutions
-  22:
-    main:                22.hs
+  #22:
+    #main:                22.hs
+    #dependencies:
+    #- advent-solutions
+  24:
+    main:                24.hs
     dependencies:
     - advent-solutions
