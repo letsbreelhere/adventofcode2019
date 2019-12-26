@@ -29,6 +29,9 @@ occupied = flip S.member
 standardNeighbor :: PointWithDepth -> Dir -> PointWithDepth
 standardNeighbor (PWD p d) dir = PWD (p + vectorRep dir) d
 
+invertPoint :: PointWithDepth -> PointWithDepth
+invertPoint (PWD (V2 x y) d) = PWD (V2 y x) d
+
 westNeighbor :: PointWithDepth -> [PointWithDepth]
 westNeighbor pwd@(PWD point depth) =
   case point of
@@ -44,18 +47,10 @@ eastNeighbor pwd@(PWD point depth) =
     _ -> [standardNeighbor pwd E]
 
 northNeighbor :: PointWithDepth -> [PointWithDepth]
-northNeighbor pwd@(PWD point depth) =
-  case point of
-    V2 _ 4 -> [PWD (V2 2 1) (depth - 1)]
-    V2 2 1 -> [PWD p' (depth+1) | x <- [0..4], let p' = V2 x 4]
-    _ -> [standardNeighbor pwd N]
+northNeighbor = map invertPoint . eastNeighbor . invertPoint
 
 southNeighbor :: PointWithDepth -> [PointWithDepth]
-southNeighbor pwd@(PWD point depth) =
-  case point of
-    V2 _ 0 -> [PWD (V2 2 3) (depth - 1)]
-    V2 2 3 -> [PWD p' (depth+1) | x <- [0..4], let p' = V2 x 0]
-    _ -> [standardNeighbor pwd S]
+southNeighbor = map invertPoint . westNeighbor . invertPoint
 
 neighbors :: PointWithDepth -> [PointWithDepth]
 neighbors p = concatMap ($ p) [northNeighbor, southNeighbor, eastNeighbor, westNeighbor]
